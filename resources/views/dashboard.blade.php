@@ -23,7 +23,7 @@
                 <li class="nav-item"><a href="/record_attendance.php" class="nav-link"><i class="bi bi-calendar2-plus-fill"></i> Record Attendance</a></li>
                 <li class="nav-item"><a href="/payroll/generate_payroll.php" class="nav-link"><i class="bi bi-currency-dollar"></i> Payroll</a></li>
                 <li class="nav-item"><a href="/add_position.php" class="nav-link"><i class="bi bi-person-fill-add"></i> Manage Position</a></li>
-                <li class="nav-item"><a href="{{ route('logout') }}" class="nav-link text-danger" onclick="return confirm('Are you sure you want to logout?');"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                <!-- Logout removed for now -->
             </ul>
         </div>
         <div class="content" id="content-area">

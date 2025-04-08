@@ -4,23 +4,17 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Session;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        // Check if user is authenticated
-        if (!Session::has('user_id') || !Session::has('username')) {
-            return redirect('/login');
-        }
-
         // Fetch dashboard data
         $attendanceData = $this->fetchAttendanceData();
         $rankingData = $this->fetchRankingData();
 
         return view('dashboard', [
-            'username' => Session::get('username'),
+            'username' => 'Guest', // Hardcoded for now, replace if needed
             'attendanceData' => $attendanceData,
             'rankingData' => $rankingData
         ]);
