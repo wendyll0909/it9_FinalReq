@@ -16,11 +16,10 @@ class CreateEmployeesTable extends Migration
             $table->string('address');
             $table->string('contact');
             $table->date('hire_date');
-            $table->unsignedBigInteger('position_id')->nullable(); // Allow null temporarily
-            $table->string('qr_code')->unique()->nullable();
+            $table->unsignedBigInteger('position_id');
+            $table->string('qr_code')->unique()->nullable(); // For QR code check-in
             $table->timestamps();
-            // Comment out or remove foreign key for now
-            // $table->foreign('position_id')->references('position_id')->on('positions')->onDelete('cascade');
+            $table->foreign('position_id')->references('position_id')->on('positions')->onDelete('cascade');
         });
     }
 
@@ -28,5 +27,4 @@ class CreateEmployeesTable extends Migration
     {
         Schema::dropIfExists('employees');
     }
-}
-?>
+};
