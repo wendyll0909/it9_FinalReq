@@ -8,9 +8,15 @@
     <link rel="stylesheet" href="{{ asset('assets/css/styles.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="{{ asset('assets/js/dashboard.js') }}"></script>
 </head>
 <body>
     <div class="container-fluid d-flex">
+        <!-- Hamburger Menu Button -->
+        <div class="hamburger-menu">
+            <i class="bi bi-list"></i>
+        </div>
+        <!-- Sidebar -->
         <div class="sidebar">
             <div class="d-flex align-items-center justify-content-center my-3">
                 <img src="{{ asset('assets/img/NDBLogo.png') }}" class="img-fluid me-3" style="max-width: 80px;" alt="Company Logo">
@@ -69,41 +75,6 @@
             </div>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // SPA navigation
-            const navLinks = document.querySelectorAll('.nav-link[data-section]');
-            const sections = document.querySelectorAll('#content-area > div');
-
-            navLinks.forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const section = this.getAttribute('data-section');
-
-                    // Hide all sections
-                    sections.forEach(sec => sec.style.display = 'none');
-
-                    // Show selected section
-                    const targetSection = document.getElementById(`${section}-section`);
-                    if (targetSection) {
-                        targetSection.style.display = 'block';
-                    }
-
-                    // Optionally fetch content via AJAX
-                    if (section !== 'dashboard') {
-                        axios.get(`/api/${section}`)
-                            .then(response => {
-                                targetSection.innerHTML = response.data.html || `<h2>${section.charAt(0).toUpperCase() + section.slice(1)}</h2><p>Content loaded dynamically.</p>`;
-                            })
-                            .catch(error => {
-                                targetSection.innerHTML = `<h2>Error</h2><p>Failed to load ${section} content.</p>`;
-                            });
-                    }
-                });
-            });
-        });
-    </script>
 </body>
 </html>
