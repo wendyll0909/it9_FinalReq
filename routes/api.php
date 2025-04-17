@@ -13,7 +13,9 @@ Route::post('/employees/{id}/restore', [EmployeeController::class, 'restore']);
 Route::delete('/employees/{id}', [EmployeeController::class, 'destroy']);
 Route::get('/positions', [EmployeeController::class, 'getPositions']);
 Route::post('/positions', [EmployeeController::class, 'storePosition']);
-
+Route::get('/positions/{id}', [EmployeeController::class, 'showPosition']);
+Route::put('/positions/{id}', [EmployeeController::class, 'updatePosition']);
+Route::delete('/positions/{id}', [EmployeeController::class, 'destroyPosition']);
 Route::get('/{section}', function($section) {
     return response()->json(['html' => "<p>Content for {$section} loaded dynamically.</p>"]);
 });

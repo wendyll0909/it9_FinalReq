@@ -83,10 +83,13 @@ body {
     margin-bottom: 10px;
 }
 
-.employee-dropdown .dropdown-link {
-    font-size: 16px;
-    padding: 8px;
+.employee-dropdown .dropdown-link::before {
+    content: "▶";
+    margin-right: 6px;
+    font-size: 0.9em;
+    color: #555; /* Optional */
 }
+
 
 .content {
     margin-left: 0;
