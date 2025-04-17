@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (csrfToken) {
         axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken.getAttribute('content');
     } else {
-        console.error('CSRF token meta tag not found');
+        console.error('CSRF token meta tag not found. AJAX requests may fail.');
     }
 
     // Toggle section and dropdown
@@ -318,14 +318,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 const qrCode = this.getAttribute('data-qr');
                 const qrImage = document.getElementById('qrImage');
                 const viewQrModal = document.getElementById('viewQrModal');
+                
                 if (qrImage && viewQrModal) {
-                    qrImage.src = `${baseUrl}/qr_codes/${qrCode}.png`;
+                    // Add timestamp to prevent caching issues
+                    const timestamp = new Date().getTime();
+                    qrImage.src = `${baseUrl}/qr_codes/${qrCode}?t=${timestamp}`;
+                    
+                    // Store the QR code filename for download
+                    qrImage.setAttribute('data-filename', qrCode);
+                    
                     new bootstrap.Modal(viewQrModal).show();
                 } else {
                     console.error('qrImage or viewQrModal not found');
                 }
             });
         });
+    } // Closing brace for attachEmployeeEventListeners
+
+    // Add download functionality for QR code
+    function downloadQR() {
+        const qrImage = document.getElementById('qrImage');
+        const filename = qrImage.getAttribute('data-filename');
+        if (filename) {
+            const link = document.createElement('a');
+            link.href = `${baseUrl}/qr_codes/${filename}`;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            console.error('QR code filename not found');
+        }
     }
 
     // Attach inactive employee event listeners
@@ -371,21 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
-
-        document.querySelectorAll('.view-qr').forEach(button => {
-            button.addEventListener('click', function() {
-                const qrCode = this.getAttribute('data-qr');
-                const qrImage = document.getElementById('qrImage');
-                const viewQrModal = document.getElementById('viewQrModal');
-                if (qrImage && viewQrModal) {
-                    qrImage.src = `${baseUrl}/qr_codes/${qrCode}.png`;
-                    new bootstrap.Modal(viewQrModal).show();
-                } else {
-                    console.error('qrImage or viewQrModal not found');
-                }
-            });
-        });
-    }
+    } // Closing brace for attachInactiveEmployeeEventListeners
 
     // Attach position event listeners
     function attachPositionEventListeners() {
@@ -485,7 +494,10 @@ document.addEventListener('DOMContentLoaded', function() {
             axios.post(`${baseUrl}/api/employees`, data)
                 .then(() => {
                     alert('Employee added successfully.');
-                    bootstrap.Modal.getInstance(addEmployeeModal).hide();
+                    const modalInstance = bootstrap.Modal.getInstance(addEmployeeModal);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
                     this.reset();
                     loadEmployees(1);
                 })
@@ -518,7 +530,10 @@ document.addEventListener('DOMContentLoaded', function() {
             axios.put(`${baseUrl}/api/employees/${id}`, data)
                 .then(() => {
                     alert('Employee updated successfully.');
-                    bootstrap.Modal.getInstance(document.getElementById('editEmployeeModal')).hide();
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('editEmployeeModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
                     loadEmployees(1);
                 })
                 .catch(error => {
@@ -545,7 +560,10 @@ document.addEventListener('DOMContentLoaded', function() {
             axios.post(`${baseUrl}/api/positions`, data)
                 .then(() => {
                     alert('Position added successfully.');
-                    bootstrap.Modal.getInstance(document.getElementById('addPositionModal')).hide();
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('addPositionModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
                     this.reset();
                     loadPositions();
                 })
@@ -571,10 +589,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 description: document.getElementById('edit_description').value,
                 base_salary: document.getElementById('edit_base_salary').value
             };
+            
+            console.log('Updating position with ID:', id);
+            console.log('Request URL:', `${baseUrl}/api/positions/${id}`);
+            
             axios.put(`${baseUrl}/api/positions/${id}`, data)
                 .then(() => {
                     alert('Position updated successfully.');
-                    bootstrap.Modal.getInstance(document.getElementById('editPositionModal')).hide();
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('editPositionModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
                     loadPositions();
                 })
                 .catch(error => {
@@ -583,7 +608,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         data: error.response?.data,
                         message: error.message
                     });
-                    alert('Error updating position: ' + (error.response?.data?.message || 'Unknown error'));
+                    alert('Error updating position: ' + (error.response?.data?.message || error.message));
                 });
         });
     }

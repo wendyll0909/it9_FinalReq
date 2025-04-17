@@ -6,7 +6,10 @@ use App\Models\Employee;
 use App\Models\Position;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Builder\Builder;
+use Endroid\QrCode\Encoding\Encoding;
+use Endroid\QrCode\ErrorCorrectionLevel\ErrorCorrectionLevelHigh;
+use Endroid\QrCode\RoundBlockSizeMode\RoundBlockSizeModeMargin;
 use Endroid\QrCode\Writer\PngWriter;
 
 class EmployeeController extends Controller
@@ -51,22 +54,41 @@ class EmployeeController extends Controller
 
         // Generate QR code
         try {
-            $qrCode = QrCode::create($employee->employee_id)
-                ->setSize(300);
-            $writer = new PngWriter();
-            $result = $writer->write($qrCode);
-            $qrPath = public_path('qr_codes/' . $employee->employee_id . '.png');
             // Ensure qr_codes directory exists
             if (!file_exists(public_path('qr_codes'))) {
                 mkdir(public_path('qr_codes'), 0755, true);
             }
-            $result->saveToFile($qrPath);
+
+            $qrPath = public_path('qr_codes/' . $employee->employee_id . '.png');
+            
+            // Generate QR code using Builder
+            $qrCode = Builder::create()
+                ->writer(new PngWriter())
+                ->data((string)$employee->employee_id)
+                ->encoding(new Encoding('UTF-8'))
+                ->errorCorrectionLevel(new ErrorCorrectionLevelHigh())
+                ->size(300)
+                ->margin(10)
+                ->roundBlockSizeMode(new RoundBlockSizeModeMargin())
+                ->build();
+            
+            // Save QR code to file
+            $qrCode->saveToFile($qrPath);
+
+            // Verify the file was created
+            if (!file_exists($qrPath)) {
+                throw new \Exception("QR code file was not created");
+            }
+
             // Update employee with QR code path
-            $employee->update(['qr_code' => $employee->employee_id]);
+            $employee->update(['qr_code' => $employee->employee_id . '.png']);
+
         } catch (\Exception $e) {
-            // Log error and continue
             \Log::error('QR Code generation failed: ' . $e->getMessage());
-            return response()->json(['message' => 'Employee added, but QR code generation failed'], 201);
+            return response()->json([
+                'message' => 'Employee added but QR code generation failed',
+                'employee' => $employee
+            ], 201);
         }
 
         return response()->json(['message' => 'Employee added successfully', 'employee' => $employee], 201);
