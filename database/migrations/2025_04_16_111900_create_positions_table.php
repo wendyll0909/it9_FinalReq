@@ -9,10 +9,10 @@ class CreatePositionsTable extends Migration
     public function up()
     {
         Schema::create('positions', function (Blueprint $table) {
-            $table->id('position_id'); // Primary key, matches unsignedBigInteger in employees
-            $table->string('position_name')->unique(); // e.g., "Manager", "Developer"
+            $table->id('position_id');
+            $table->string('position_name')->unique();
             $table->text('description')->nullable();
-            $table->decimal('base_salary', 10, 2)->nullable(); // Optional, for payroll integration
+            $table->decimal('base_salary', 10, 2)->nullable();
             $table->timestamps();
         });
     }
@@ -21,5 +21,4 @@ class CreatePositionsTable extends Migration
     {
         Schema::dropIfExists('positions');
     }
-}
-?>
+};
