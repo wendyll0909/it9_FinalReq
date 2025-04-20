@@ -28,9 +28,18 @@ class EmployeeController extends Controller
         return $query->paginate(10);
     }
 
-    public function inactive()
+    public function inactive(Request $request)
     {
-        return Employee::onlyTrashed()->with('position')->paginate(10);
+        $search = $request->query('search', '');
+        $query = Employee::onlyTrashed()->with('position');
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('fname', 'like', "%{$search}%")
+                  ->orWhere('lname', 'like', "%{$search}%")
+                  ->orWhere('mname', 'like', "%{$search}%");
+            });
+        }
+        return $query->paginate(10);
     }
 
     public function store(Request $request)
@@ -142,59 +151,5 @@ class EmployeeController extends Controller
         $employee = Employee::onlyTrashed()->findOrFail($id);
         $employee->forceDelete();
         return response()->json(['message' => 'Employee permanently deleted']);
-    }
-
-    public function getPositions()
-    {
-        return Position::all();
-    }
-
-    public function storePosition(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'position_name' => 'required|string|max:255|unique:positions',
-            'description' => 'nullable|string',
-            'base_salary' => 'nullable|numeric|min:0'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()->first()], 422);
-        }
-
-        $position = Position::create($request->all());
-        return response()->json(['message' => 'Position added successfully', 'position' => $position], 201);
-    }
-
-    public function showPosition($id)
-    {
-        $position = Position::findOrFail($id);
-        return response()->json($position);
-    }
-
-    public function updatePosition(Request $request, $id)
-    {
-        $validator = Validator::make($request->all(), [
-            'position_name' => 'required|string|max:255|unique:positions,position_name,' . $id . ',position_id',
-            'description' => 'nullable|string',
-            'base_salary' => 'nullable|numeric|min:0'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()->first()], 422);
-        }
-
-        $position = Position::findOrFail($id);
-        $position->update($request->all());
-        return response()->json(['message' => 'Position updated successfully']);
-    }
-
-    public function destroyPosition($id)
-    {
-        $position = Position::findOrFail($id);
-        if ($position->employees()->count() > 0) {
-            return response()->json(['message' => 'Cannot delete position with associated employees'], 422);
-        }
-        $position->delete();
-        return response()->json(['message' => 'Position deleted successfully']);
     }
 }

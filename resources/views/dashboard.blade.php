@@ -78,6 +78,9 @@
             <!-- Inactive Employees Section -->
             <div id="inactive-employees-section" style="display: none;">
                 <h2>Inactive Employees</h2>
+                <div class="mb-3">
+                    <input type="text" id="inactiveEmployeeSearch" class="form-control" placeholder="Search by name...">
+                </div>
                 <table class="table table-bordered">
                     <thead>
                         <tr>
@@ -269,8 +272,8 @@
                         </div>
                         <div class="modal-body">
                             <form id="editPositionForm">
-                                <input type="hidden" id="edit_position_id">
-                                <div class="mb-3">
+                            <input type="hidden" id="edit_position_id" name="position_id">
+                            <div class="mb-3">
                                     <label for="edit_position_name" class="form-label">Position Name</label>
                                     <input type="text" class="form-control" id="edit_position_name" required>
                                 </div>

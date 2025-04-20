@@ -44,13 +44,13 @@ function loadEmployees(page, search, baseUrl, updatePagination) {
         });
 }
 
-function loadInactiveEmployees(page, baseUrl, updatePagination) {
+function loadInactiveEmployees(page, baseUrl, updatePagination, search = '') {
     const tbody = document.getElementById('inactiveEmployeeTable');
     if (!tbody) {
         console.error('inactiveEmployeeTable not found');
         return;
     }
-    axios.get(`${baseUrl}/api/inactive-employees?page=${page}`)
+    axios.get(`${baseUrl}/api/inactive-employees?page=${page}&search=${encodeURIComponent(search)}`)
         .then(response => {
             if (!response.data || !response.data.data) {
                 throw new Error('Invalid response format: No data received');
@@ -75,7 +75,7 @@ function loadInactiveEmployees(page, baseUrl, updatePagination) {
                 `;
             });
             if (typeof updatePagination === 'function') {
-                updatePagination('inactiveEmployeePagination', pagination, page, (p) => loadInactiveEmployees(p, baseUrl, updatePagination));
+                updatePagination('inactiveEmployeePagination', pagination, page, (p, s) => loadInactiveEmployees(p, baseUrl, updatePagination, s), search);
             }
             attachInactiveEmployeeEventListeners(baseUrl);
         })
@@ -167,7 +167,7 @@ function attachEmployeeEventListeners(baseUrl) {
                 axios.post(`${baseUrl}/api/employees/${id}/archive`)
                     .then(() => {
                         alert('Employee archived successfully.');
-                        loadEmployees(1, '', baseUrl); // Removed updatePagination
+                        loadEmployees(1, '', baseUrl);
                     })
                     .catch(error => {
                         console.error('Error archiving employee:', {
@@ -208,7 +208,7 @@ function attachInactiveEmployeeEventListeners(baseUrl) {
                 axios.post(`${baseUrl}/api/employees/${id}/restore`)
                     .then(() => {
                         alert('Employee restored successfully.');
-                        loadInactiveEmployees(1, baseUrl); // Removed updatePagination
+                        loadInactiveEmployees(1, baseUrl);
                     })
                     .catch(error => {
                         console.error('Error restoring employee:', {
@@ -229,7 +229,7 @@ function attachInactiveEmployeeEventListeners(baseUrl) {
                 axios.delete(`${baseUrl}/api/employees/${id}`)
                     .then(() => {
                         alert('Employee deleted successfully.');
-                        loadInactiveEmployees(1, baseUrl); // Removed updatePagination
+                        loadInactiveEmployees(1, baseUrl);
                     })
                     .catch(error => {
                         console.error('Error deleting employee:', {
@@ -318,7 +318,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         modalInstance.hide();
                     }
                     this.reset();
-                    loadEmployees(1, '', baseUrl); // No updatePagination
+                    loadEmployees(1, '', baseUrl);
                 })
                 .catch(error => {
                     console.error('Error adding employee:', {
@@ -352,7 +352,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (modalInstance) {
                         modalInstance.hide();
                     }
-                    loadEmployees(1, '', baseUrl); // No updatePagination
+                    loadEmployees(1, '', baseUrl);
                 })
                 .catch(error => {
                     console.error('Error updating employee:', {
@@ -368,7 +368,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const employeeSearch = document.getElementById('employeeSearch');
     if (employeeSearch) {
         employeeSearch.addEventListener('input', function() {
-            loadEmployees(1, this.value, baseUrl); // No updatePagination
+            loadEmployees(1, this.value, baseUrl);
+        });
+    }
+
+    const inactiveEmployeeSearch = document.getElementById('inactiveEmployeeSearch');
+    if (inactiveEmployeeSearch) {
+        inactiveEmployeeSearch.addEventListener('input', function() {
+            loadInactiveEmployees(1, baseUrl, null, this.value);
         });
     }
 });
