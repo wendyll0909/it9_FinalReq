@@ -41,10 +41,10 @@ class PositionController extends Controller
             ]);
 
             if ($validator->fails()) {
-                Log::error('Position validation failed', ['errors' => $validator->errors()->toArray()]);
+                Log::warning('Position validation failed', ['errors' => $validator->errors()->toArray()]);
                 return response()->view('positions.table', [
                     'positions' => Position::all(),
-                    'errors' => $validator->errors()
+                    'error' => '<div class="error">' . $validator->errors()->first() . '</div>'
                 ], 422);
             }
 
@@ -57,6 +57,20 @@ class PositionController extends Controller
             $positions = Position::all();
             return response()->view('positions.table', compact('positions'))
                 ->with('success', 'Position added successfully');
+        } catch (QueryException $e) {
+            Log::error('Position store database error', [
+                'error' => $e->getMessage(),
+                'sql_error' => $e->getSql(),
+                'bindings' => $e->getBindings(),
+                'request_data' => $request->all(),
+                'queries' => DB::getQueryLog()
+            ]);
+            $errorMessage = str_contains($e->getMessage(), 'Duplicate entry') ?
+                'Position name already exists' : 'Database error occurred';
+            return response()->view('positions.table', [
+                'positions' => Position::all(),
+                'error' => '<div class="error">' . $errorMessage . '</div>'
+            ], 422);
         } catch (\Exception $e) {
             Log::error('Position store failed', [
                 'error' => $e->getMessage(),
@@ -66,7 +80,7 @@ class PositionController extends Controller
             ]);
             return response()->view('positions.table', [
                 'positions' => Position::all(),
-                'error' => 'Failed to add position: ' . $e->getMessage()
+                'error' => '<div class="error">Failed to add position: ' . $e->getMessage() . '</div>'
             ], 500);
         }
     }
@@ -83,7 +97,7 @@ class PositionController extends Controller
             ]);
             return response()->view('positions.table', [
                 'positions' => Position::all(),
-                'error' => 'Failed to load position: ' . $e->getMessage()
+                'error' => '<div class="error">Failed to load position: ' . $e->getMessage() . '</div>'
             ], 500);
         }
     }
@@ -101,10 +115,10 @@ class PositionController extends Controller
             ]);
 
             if ($validator->fails()) {
-                Log::error('Position update validation failed', ['errors' => $validator->errors()->toArray()]);
+                Log::warning('Position update validation failed', ['errors' => $validator->errors()->toArray()]);
                 return response()->view('positions.table', [
                     'positions' => Position::all(),
-                    'errors' => $validator->errors()
+                    'error' => '<div class="error">' . $validator->errors()->first() . '</div>'
                 ], 422);
             }
 
@@ -127,10 +141,10 @@ class PositionController extends Controller
                 'queries' => DB::getQueryLog()
             ]);
             $errorMessage = str_contains($e->getMessage(), 'Duplicate entry') ?
-                'Position name already exists' : 'Database error: ' . $e->getMessage();
+                'Position name already exists' : 'Database error occurred';
             return response()->view('positions.table', [
                 'positions' => Position::all(),
-                'error' => $errorMessage
+                'error' => '<div class="error">' . $errorMessage . '</div>'
             ], 422);
         } catch (\Exception $e) {
             Log::error('Position update failed', [
@@ -141,7 +155,7 @@ class PositionController extends Controller
             ]);
             return response()->view('positions.table', [
                 'positions' => Position::all(),
-                'error' => 'Failed to update position: ' . $e->getMessage()
+                'error' => '<div class="error">Failed to update position: ' . $e->getMessage() . '</div>'
             ], 500);
         }
     }
@@ -160,7 +174,7 @@ class PositionController extends Controller
                 ]);
                 return response()->view('positions.table', [
                     'positions' => Position::all(),
-                    'error' => '<div class="error">Warning: Deleting this position will also delete ' . $employeeCount . ' associated employee(s) due to database constraints.</div>'
+                    'error' => '<div class="error">Cannot delete position with ' . $employeeCount . ' associated employee(s). Please reassign or delete employees first.</div>'
                 ], 422);
             }
 
@@ -177,7 +191,7 @@ class PositionController extends Controller
             ]);
             return response()->view('positions.table', [
                 'positions' => Position::all(),
-                'error' => 'Failed to delete position: ' . $e->getMessage()
+                'error' => '<div class="error">Failed to delete position: ' . $e->getMessage() . '</div>'
             ], 500);
         }
     }
@@ -194,7 +208,7 @@ class PositionController extends Controller
             ]);
             return response()->view('positions.select-options', [
                 'positions' => collect([]),
-                'error' => 'Failed to load positions: ' . $e->getMessage()
+                'error' => '<div class="error">Failed to load positions: ' . $e->getMessage() . '</div>'
             ], 500);
         }
     }
