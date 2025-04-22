@@ -95,8 +95,7 @@
 
     <!-- Modals -->
     <!-- Add Employee Modal -->
-    <div class="modal fade" id="addEmployeeModal" tabindex="-1" aria-labelledby="addEmployeeModalLabel" aria-hidden="true"
-         hx-get="{{ url('/dashboard/positions/list') }}" hx-target="#employeePositionSelect" hx-swap="innerHTML" hx-trigger="load">
+    <div class="modal fade" id="addEmployeeModal" tabindex="-1" aria-labelledby="addEmployeeModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -132,10 +131,13 @@
                         </div>
                         <div class="mb-3">
                             <label for="position_id" class="form-label">Position</label>
-                            <select class="form-control" id="position_id" name="position_id" required>
+                            <select class="form-control" id="position_id" name="position_id" required
+                                    hx-get="{{ route('positions.list') }}"
+                                    hx-target="this"
+                                    hx-swap="innerHTML"
+                                    hx-trigger="shown.bs.modal from:#addEmployeeModal">
                                 <option value="">Loading positions...</option>
                             </select>
-                            <div id="employeePositionSelect"></div>
                         </div>
                         <button type="submit" class="btn btn-primary">Add Employee</button>
                     </form>

@@ -9,12 +9,14 @@ Route::get('/', fn() => redirect('/dashboard'));
 
 Route::prefix('dashboard')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
-    Route::resource('employees', EmployeeController::class);
+    
+    // Employee routes
     Route::get('employees/inactive', [EmployeeController::class, 'inactive'])->name('employees.inactive');
     Route::post('employees/{id}/archive', [EmployeeController::class, 'archive'])->name('employees.archive');
     Route::post('employees/{id}/restore', [EmployeeController::class, 'restore'])->name('employees.restore');
-    Route::resource('positions', PositionController::class);
-    Route::get('positions/{id}', [PositionController::class, 'show'])->name('positions.show');
-    Route::get('employees/{id}', [EmployeeController::class, 'show'])->name('employees.show');
+    Route::resource('employees', EmployeeController::class);
+    
+    // Position routes
     Route::get('positions/list', [PositionController::class, 'list'])->name('positions.list');
+    Route::resource('positions', PositionController::class);
 });

@@ -28,13 +28,13 @@ body {
     top: 0;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
     overflow-y: auto;
-    transform: translateX(-270px);
+    transform: translateX(-270px) !important;
     transition: transform 0.3s ease;
     z-index: 900;
 }
 
 .sidebar.visible {
-    transform: translateX(0);
+    transform: translateX(0) !important;
 }
 
 .sidebar h1 {

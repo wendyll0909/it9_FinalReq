@@ -1,181 +1,195 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
+    const sidebar = document.getElementById('sidebar');
+    const hamburger = document.getElementById('hamburger');
+    const contentArea = document.getElementById('content-area');
+    const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
     let isSidebarToggled = false;
     let isSidebarHovered = false;
     let isHamburgerHovered = false;
-    let debounceTimeout = null;
+    let isNavigating = false;
+    let dropdownTimeout;
 
-    // Debounce function to prevent rapid event firing
-    function debounce(fn, ms) {
-        return function(...args) {
-            clearTimeout(debounceTimeout);
-            debounceTimeout = setTimeout(() => fn.apply(this, args), ms);
-        };
+    function toggleSidebar() {
+        isSidebarToggled = !isSidebarToggled;
+        console.log('Sidebar toggled, states:', { isSidebarToggled, isHamburgerHovered, isSidebarHovered, isNavigating });
+        if (isSidebarToggled) {
+            sidebar.classList.add('visible');
+            hamburger.style.display = 'none';
+        } else {
+            sidebar.classList.remove('visible');
+            hamburger.style.display = 'block';
+        }
     }
 
-    // Sidebar persistence on navigation
-    document.addEventListener('click', function(e) {
-        const target = e.target.closest('[data-persist-sidebar]');
-        if (target) {
-            const sidebar = document.querySelector('.sidebar');
-            if (sidebar) {
-                sidebar.classList.add('visible');
-                isSidebarToggled = true;
+    hamburger.addEventListener('click', toggleSidebar);
+
+    function debouncedToggleSidebar() {
+        clearTimeout(dropdownTimeout);
+        dropdownTimeout = setTimeout(() => {
+            if (!isSidebarToggled && !isSidebarHovered && !isHamburgerHovered && !isNavigating) {
+                sidebar.classList.remove('visible');
+                hamburger.style.display = 'block';
+                console.log('Sidebar hidden due to no hover, states:', { isHamburgerHovered, isSidebarHovered, isSidebarToggled, isNavigating });
             }
+        }, 200);
+    }
+
+    sidebar.addEventListener('mouseenter', () => {
+        isSidebarHovered = true;
+        console.log('Sidebar mouseenter, states:', { isHamburgerHovered, isSidebarHovered, isSidebarToggled, isNavigating });
+        if (!isSidebarToggled && !isNavigating) {
+            sidebar.classList.add('visible');
+            hamburger.style.display = 'none';
         }
     });
 
-    // Hamburger menu and sidebar hover handling
-    const hamburger = document.querySelector('.hamburger-menu');
-    const sidebar = document.querySelector('.sidebar');
-    if (hamburger && sidebar) {
-        // Hamburger click to toggle sidebar
-        hamburger.addEventListener('click', function() {
-            isSidebarToggled = !isSidebarToggled;
-            sidebar.classList.toggle('visible', isSidebarToggled);
-            hamburger.style.display = isSidebarToggled ? 'none' : 'block';
-            console.log('Hamburger clicked, isSidebarToggled:', isSidebarToggled);
-        });
+    sidebar.addEventListener('mouseleave', () => {
+        isSidebarHovered = false;
+        console.log('Sidebar mouseleave, states:', { isHamburgerHovered, isSidebarHovered, isSidebarToggled, isNavigating });
+        debouncedToggleSidebar();
+    });
 
-        // Hamburger hover
-        hamburger.addEventListener('mouseenter', debounce(function() {
-            if (!isSidebarToggled) {
-                isHamburgerHovered = true;
-                sidebar.classList.add('visible');
-                hamburger.style.display = 'block'; // Keep visible during hover
-                console.log('Hamburger mouseenter, sidebar visible');
+    hamburger.addEventListener('mouseenter', () => {
+        isHamburgerHovered = true;
+        console.log('Hamburger mouseenter, states:', { isHamburgerHovered, isSidebarHovered, isSidebarToggled, isNavigating });
+        if (!isSidebarToggled && !isNavigating) {
+            sidebar.classList.add('visible');
+            hamburger.style.display = 'none';
+        }
+    });
+
+    hamburger.addEventListener('mouseleave', () => {
+        isHamburgerHovered = false;
+        console.log('Hamburger mouseleave, states:', { isHamburgerHovered, isSidebarHovered, isSidebarToggled, isNavigating });
+        debouncedToggleSidebar();
+    });
+
+    dropdownToggles.forEach(toggle => {
+        toggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            const parentLi = this.parentElement;
+            const isActive = parentLi.classList.contains('active');
+            console.log('Dropdown toggle clicked', { toggle: this.textContent, isActive });
+
+            document.querySelectorAll('.sidebar-menu li.active').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            if (!isActive) {
+                parentLi.classList.add('active');
             }
-        }, 100));
+        });
+    });
 
-        hamburger.addEventListener('mouseleave', debounce(function() {
-            isHamburgerHovered = false;
+    document.body.addEventListener('htmx:beforeRequest', function (e) {
+        if (e.target.tagName === 'A' && e.target.getAttribute('hx-get')) {
+            isNavigating = true;
+            console.log('HTMX navigation started, states:', { isNavigating, isSidebarToggled, isSidebarHovered, target: e.target.href });
+        }
+    });
+
+    document.body.addEventListener('htmx:afterRequest', function(e) {
+        const formIds = ['addEmployeeForm', 'editEmployeeForm', 'addPositionForm', 'editPositionForm'];
+        const isDeleteForm = e.target && e.target.id && e.target.id.startsWith('deletePositionForm_');
+        const isFormRequest = e.target && e.target.id && (formIds.includes(e.target.id) || isDeleteForm);
+
+        if (isFormRequest) {
+            if (e.detail.successful) {
+                const modalId = e.target.id.includes('Employee') ? 'addEmployeeModal' : 'addPositionModal';
+                const modalElement = document.getElementById(modalId);
+                if (modalElement) {
+                    const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
+                    modal.hide();
+                    console.log(`Closed modal: ${modalId}`);
+                } else if (!isDeleteForm) {
+                    console.error(`Modal ${modalId} not found`);
+                }
+                const errorContainer = document.getElementById('error-message');
+                if (errorContainer) errorContainer.innerHTML = '';
+            } else {
+                console.error(`HTMX request failed for ${e.target.id || 'unknown form'}:`, e.detail.xhr.status, e.detail.xhr.responseText);
+                const errorContainer = document.getElementById('error-message') || document.createElement('div');
+                if (!errorContainer.id) {
+                    errorContainer.id = 'error-message';
+                    errorContainer.className = 'alert alert-danger';
+                    document.querySelector('#content-area').prepend(errorContainer);
+                }
+                let errorMessage = 'An error occurred. Please try again.';
+                if (e.detail.xhr.status === 422) {
+                    errorMessage = e.detail.xhr.responseText.match(/<div[^>]*error[^>]*>([^<]*)<\/div>/)?.[1] || 'Validation error occurred';
+                } else if (e.detail.xhr.status === 500) {
+                    errorMessage = 'Server error occurred. Please try again later.';
+                }
+                errorContainer.style.display = 'block';
+                errorContainer.innerHTML = errorMessage;
+            }
+        } else {
+            // Handle non-form requests (e.g., navigation links)
+            if (!e.detail.successful) {
+                console.error(`HTMX request failed for ${e.detail.path}:`, e.detail.xhr.status, e.detail.xhr.responseText);
+                const errorContainer = document.getElementById('error-message') || document.createElement('div');
+                if (!errorContainer.id) {
+                    errorContainer.id = 'error-message';
+                    errorContainer.className = 'alert alert-danger';
+                    document.querySelector('#content-area').prepend(errorContainer);
+                }
+                let errorMessage = e.detail.xhr.status === 500 ? 'Server error occurred. Please try again later.' : 'Request failed.';
+                errorContainer.style.display = 'block';
+                errorContainer.innerHTML = errorMessage;
+            }
+        }
+        // Reset navigation state
+        if (isNavigating) {
+            isNavigating = false;
+            console.log('Navigation completed, isNavigating reset, states:', { isNavigating, isSidebarToggled });
             if (!isSidebarToggled && !isSidebarHovered) {
                 sidebar.classList.remove('visible');
                 hamburger.style.display = 'block';
-                console.log('Hamburger mouseleave, sidebar hidden');
-            } else {
-                hamburger.style.display = 'none'; // Hide if sidebar is hovered
-                console.log('Hamburger mouseleave, sidebar still visible');
+                console.log('Sidebar hidden after navigation, states:', { isHamburgerHovered, isSidebarHovered, isSidebarToggled, isNavigating });
             }
-        }, 100));
+        }
+    });
 
-        // Sidebar hover
-        sidebar.addEventListener('mouseenter', debounce(function() {
-            if (!isSidebarToggled) {
-                isSidebarHovered = true;
-                sidebar.classList.add('visible');
-                hamburger.style.display = 'none';
-                console.log('Sidebar mouseenter, sidebar visible');
-            }
-        }, 100));
-
-        sidebar.addEventListener('mouseleave', debounce(function() {
-            isSidebarHovered = false;
-            if (!isSidebarToggled && !isHamburgerHovered) {
-                sidebar.classList.remove('visible');
-                hamburger.style.display = 'block';
-                console.log('Sidebar mouseleave, sidebar hidden');
-            }
-            console.log('Sidebar mouseleave, hamburger visible');
-        }, 100));
-    }
-
-    // Toggle employee dropdown and handle navigation
-    const employeeLink = document.querySelector('.nav-link[data-toggle-dropdown]');
-    const employeeDropdown = document.querySelector('.employee-dropdown');
-    if (employeeLink && employeeDropdown) {
-        employeeLink.addEventListener('click', debounce(function(e) {
-            e.preventDefault();
-            console.log('Employee link clicked, dropdown display:', employeeDropdown.style.display);
-            employeeDropdown.style.display = employeeDropdown.style.display === 'block' ? 'none' : 'block';
-            if (!employeeLink.classList.contains('htmx-request')) {
-                console.log('Triggering HTMX navigation to:', employeeLink.getAttribute('hx-get'));
-                htmx.ajax('GET', employeeLink.getAttribute('hx-get'), {
-                    target: employeeLink.getAttribute('hx-target'),
-                    swap: employeeLink.getAttribute('hx-swap')
-                }).catch(error => {
-                    console.error('HTMX navigation failed:', error);
-                });
-            }
-        }, 200));
-    }
-
-    // View QR code
-    document.addEventListener('click', function(e) {
+    document.body.addEventListener('click', function (e) {
         if (e.target.classList.contains('view-qr')) {
             const qrCode = e.target.getAttribute('data-qr');
+            console.log('View QR clicked', { qrCode });
+            const qrModal = new bootstrap.Modal(document.getElementById('viewQrModal'));
             const qrImage = document.getElementById('qrImage');
-            const viewQrModal = document.getElementById('viewQrModal');
-            if (qrImage && viewQrModal) {
-                const timestamp = new Date().getTime();
-                qrImage.src = `/qr_codes/${qrCode}?t=${timestamp}`;
-                qrImage.setAttribute('data-filename', qrCode);
-                new bootstrap.Modal(viewQrModal).show();
-            } else {
-                console.error('QR modal elements not found');
-            }
+            qrImage.src = `/qr_codes/${qrCode}.png`;
+            qrModal.show();
+        }
+
+        if (e.target.classList.contains('edit-employee')) {
+            const employeeId = e.target.getAttribute('data-id');
+            console.log('Edit employee clicked', { employeeId });
+            htmx.ajax('GET', `/dashboard/employees/${employeeId}`, {
+                target: '#editEmployeeModal .modal-body',
+                swap: 'innerHTML'
+            }).then(() => {
+                const editModal = new bootstrap.Modal(document.getElementById('editEmployeeModal'));
+                editModal.show();
+            });
+        }
+
+        if (e.target.classList.contains('edit-position')) {
+            const positionId = e.target.getAttribute('data-id');
+            console.log('Edit position clicked', { positionId });
+            htmx.ajax('GET', `/dashboard/positions/${positionId}`, {
+                target: '#editPositionModal .modal-body',
+                swap: 'innerHTML'
+            }).then(() => {
+                const editModal = new bootstrap.Modal(document.getElementById('editPositionModal'));
+                editModal.show();
+            });
         }
     });
 
-    // Edit employee/position modals
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('edit-employee') || e.target.classList.contains('edit-position')) {
-            const id = e.target.getAttribute('data-id');
-            const type = e.target.classList.contains('edit-employee') ? 'employees' : 'positions';
-            const modalId = type === 'employees' ? 'editEmployeeModal' : 'editPositionModal';
-            const formContainer = document.getElementById(`edit-${type.slice(0, -1)}-form`);
-            if (formContainer) {
-                formContainer.innerHTML = '<p>Loading...</p>';
-                console.log(`Fetching ${type}/${id}`);
-                htmx.ajax('GET', `/dashboard/${type}/${id}`, {
-                    target: `#edit-${type.slice(0, -1)}-form`,
-                    swap: 'innerHTML'
-                }).then(() => {
-                    console.log(`Loaded ${type}/${id} successfully`);
-                    const modal = new bootstrap.Modal(document.getElementById(modalId));
-                    modal.show();
-                }).catch(error => {
-                    console.error(`Failed to load ${type}/${id}:`, error);
-                    formContainer.innerHTML = `<p>Error loading ${type.slice(0, -1)} data. Please try again.</p>`;
-                });
-            } else {
-                console.error(`Form container for ${type} not found`);
-            }
-        }
+    document.getElementById('addEmployeeModal').addEventListener('show.bs.modal', function () {
+        console.log('Add employee modal shown');
+        htmx.ajax('GET', '/dashboard/positions/list', {
+            target: '#addEmployeeModal select[name="position_id"]',
+            swap: 'innerHTML'
+        });
     });
-
-    // Modal closing for forms
-    document.body.addEventListener('htmx:afterRequest', function(e) {
-        const formIds = ['addEmployeeForm', 'addPositionForm', 'editEmployeeForm', 'editPositionForm'];
-        if (formIds.includes(e.target.id) && e.detail.successful) {
-            const modalId = e.target.id.includes('Employee') ? 'addEmployeeModal' : 'addPositionModal';
-            const modalElement = document.getElementById(modalId);
-            if (modalElement) {
-                const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
-                modal.hide();
-                console.log(`Closed modal: ${modalId}`);
-            } else {
-                console.error(`Modal ${modalId} not found`);
-            }
-        }
-    });
-
-    // Auto-dismiss alerts
-    setTimeout(() => {
-        const alerts = document.querySelectorAll('.alert');
-        alerts.forEach(alert => alert.classList.add('fade-out'));
-    }, 1000);
 });
-
-// Download QR code
-function downloadQR() {
-    const qrImage = document.getElementById('qrImage');
-    const filename = qrImage.getAttribute('data-filename');
-    if (filename) {
-        const link = document.createElement('a');
-        link.href = `/qr_codes/${filename}`;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-}

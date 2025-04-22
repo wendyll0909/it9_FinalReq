@@ -37,5 +37,12 @@
             @endforeach
         </select>
     </div>
+    <div class="mb-3">
+        <label for="edit_status" class="form-label">Status</label>
+        <select class="form-control" id="edit_status" name="status" required>
+            <option value="active" {{ $employee->status == 'active' ? 'selected' : '' }}>Active</option>
+            <option value="inactive" {{ $employee->status == 'inactive' ? 'selected' : '' }}>Inactive</option>
+        </select>
+    </div>
     <button type="submit" class="btn btn-primary">Update Employee</button>
 </form>
