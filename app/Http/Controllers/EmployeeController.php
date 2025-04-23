@@ -70,11 +70,35 @@ class EmployeeController extends Controller
      DB::beginTransaction();
      
      try {
-         // ... validation code ...
+         // Validate request data
+         $validator = Validator::make($request->all(), [
+             'fname' => 'required|string|max:255',
+             'mname' => 'nullable|string|max:255',
+             'lname' => 'required|string|max:255',
+             'address' => 'required|string',
+             'contact' => 'required|string|max:255',
+             'hire_date' => 'required|date',
+             'position_id' => 'required|exists:positions,position_id',
+         ]);
  
-         // Create employee first
+         if ($validator->fails()) {
+             return response()->view('employees.table', [
+                 'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
+                 'errors' => $validator->errors(),
+                 'search' => $request->query('search', '')
+             ], 422);
+         }
+ 
+         // Create employee
          $employee = Employee::create([
-             // ... employee data ...
+             'fname' => $request->fname,
+             'mname' => $request->mname,
+             'lname' => $request->lname,
+             'address' => $request->address,
+             'contact' => $request->contact,
+             'hire_date' => $request->hire_date,
+             'position_id' => $request->position_id,
+             'status' => 'active',
              'qr_code' => null, // Temporary null
          ]);
  
@@ -102,7 +126,8 @@ class EmployeeController extends Controller
  
          return response()->view('employees.table', [
              'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
-             'success' => 'Employee added successfully'
+             'success' => 'Employee added successfully',
+             'search' => $request->query('search', '')
          ]);
  
      } catch (\Exception $e) {
@@ -110,7 +135,8 @@ class EmployeeController extends Controller
          \Log::error('Employee Creation Error: '.$e->getMessage());
          return response()->view('employees.table', [
              'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
-             'error' => 'Employee creation failed: '.$e->getMessage()
+             'error' => 'Employee creation failed: '.$e->getMessage(),
+             'search' => $request->query('search', '')
          ], 500);
      }
  }
@@ -145,89 +171,123 @@ class EmployeeController extends Controller
                 'position_id' => 'required|exists:positions,position_id',
                 'status' => 'required|in:active,inactive'
             ]);
-
+    
             if ($validator->fails()) {
+                $search = $request->input('search', '');
                 return response()->view('employees.table', [
                     'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
-                    'errors' => $validator->errors()
+                    'errors' => $validator->errors(),
+                    'search' => $search
                 ], 422);
             }
-
+    
             $employee = Employee::findOrFail($id);
             $employee->update($request->only(['fname', 'mname', 'lname', 'address', 'contact', 'hire_date', 'position_id', 'status']));
-
-            $employees = Employee::with('position')->where('status', 'active')->paginate(10);
-            return response()->view('employees.table', compact('employees'))
-                ->with('success', 'Employee updated successfully');
+    
+            $search = $request->input('search', '');
+            $employees = Employee::with('position')
+                ->where('status', 'active')
+                ->when($search, function ($query, $search) {
+                    return $query->whereRaw("CONCAT(fname, ' ', COALESCE(mname, ''), ' ', lname) LIKE ?", ["%$search%"]);
+                })
+                ->paginate(10);
+    
+            session()->flash('success', 'Employee updated successfully');
+            return response()->view('employees.table', compact('employees', 'search'));
         } catch (\Exception $e) {
             Log::error('Employee update failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+            $search = $request->input('search', '');
+            session()->flash('error', 'Failed to update employee: ' . $e->getMessage());
             return response()->view('employees.table', [
                 'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
-                'error' => 'Failed to update employee: ' . $e->getMessage()
+                'search' => $search
             ], 500);
         }
     }
 
-    public function archive($id)
+    public function archive(Request $request, $id)
     {
         try {
             $employee = Employee::findOrFail($id);
             $employee->delete(); // Soft delete
-            $employees = Employee::with('position')->where('status', 'active')->paginate(10);
-            return response()->view('employees.table', compact('employees'))
-                ->with('success', 'Employee archived successfully');
+            $search = $request->input('search', '');
+            $employees = Employee::with('position')
+                ->where('status', 'active')
+                ->when($search, function ($query, $search) {
+                    return $query->whereRaw("CONCAT(fname, ' ', COALESCE(mname, ''), ' ', lname) LIKE ?", ["%$search%"]);
+                })
+                ->paginate(10);
+            session()->flash('success', 'Employee archived successfully');
+            return response()->view('employees.table', compact('employees', 'search'));
         } catch (\Exception $e) {
             Log::error('Employee archive failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+            $search = $request->input('search', '');
+            session()->flash('error', 'Failed to archive employee: ' . $e->getMessage());
             return response()->view('employees.table', [
                 'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
-                'error' => 'Failed to archive employee: ' . $e->getMessage()
+                'search' => $search
             ], 500);
         }
     }
 
-    public function restore($id)
+    public function restore(Request $request, $id)
     {
         try {
             $employee = Employee::withTrashed()->findOrFail($id);
             $employee->restore();
             $employee->update(['status' => 'active']);
-            $employees = Employee::with('position')->onlyTrashed()->paginate(10);
-            return response()->view('employees.inactive-table', compact('employees'))
-                ->with('success', 'Employee restored successfully');
+            $search = $request->input('search', '');
+            $employees = Employee::with('position')
+                ->onlyTrashed()
+                ->when($search, function ($query, $search) {
+                    return $query->whereRaw("CONCAT(fname, ' ', COALESCE(mname, ''), ' ', lname) LIKE ?", ["%$search%"]);
+                })
+                ->paginate(10);
+            session()->flash('success', 'Employee restored successfully');
+            return response()->view('employees.inactive-table', compact('employees', 'search'));
         } catch (\Exception $e) {
             Log::error('Employee restore failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+            $search = $request->input('search', '');
+            session()->flash('error', 'Failed to restore employee: ' . $e->getMessage());
             return response()->view('employees.inactive-table', [
                 'employees' => Employee::with('position')->onlyTrashed()->paginate(10),
-                'error' => 'Failed to restore employee: ' . $e->getMessage()
+                'search' => $search
             ], 500);
         }
     }
-
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         try {
             $employee = Employee::withTrashed()->findOrFail($id);
             $employee->forceDelete(); // Permanent delete
-            $employees = Employee::with('position')->onlyTrashed()->paginate(10);
-            return response()->view('employees.inactive-table', compact('employees'))
-                ->with('success', 'Employee permanently deleted');
+            $search = $request->input('search', '');
+            $employees = Employee::with('position')
+                ->onlyTrashed()
+                ->when($search, function ($query, $search) {
+                    return $query->whereRaw("CONCAT(fname, ' ', COALESCE(mname, ''), ' ', lname) LIKE ?", ["%$search%"]);
+                })
+                ->paginate(10);
+            session()->flash('success', 'Employee permanently deleted');
+            return response()->view('employees.inactive-table', compact('employees', 'search'));
         } catch (\Exception $e) {
             Log::error('Employee destroy failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+            $search = $request->input('search', '');
+            session()->flash('error', 'Failed to delete employee: ' . $e->getMessage());
             return response()->view('employees.inactive-table', [
                 'employees' => Employee::with('position')->onlyTrashed()->paginate(10),
-                'error' => 'Failed to delete employee: ' . $e->getMessage()
+                'search' => $search
             ], 500);
         }
     }

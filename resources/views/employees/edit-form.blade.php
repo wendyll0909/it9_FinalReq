@@ -1,7 +1,14 @@
-<form id="editEmployeeForm" hx-put="{{ route('employees.update', $employee->employee_id) }}" hx-target="#employees-section" hx-swap="innerHTML">
+<form id="editEmployeeForm" 
+      hx-put="{{ route('employees.update', $employee->employee_id) }}" 
+      hx-target="#employees-section" 
+      hx-swap="innerHTML" 
+      hx-push-url="false"
+      hx-indicator="#edit-loading"
+      hx-headers='{"X-CSRF-TOKEN": "{{ csrf_token() }}"}'>
     @csrf
     @method('PUT')
     <input type="hidden" id="edit_employee_id" name="employee_id" value="{{ $employee->employee_id }}">
+    <input type="hidden" name="search" value="{{ $search ?? '' }}">
     <div class="mb-3">
         <label for="edit_fname" class="form-label">First Name</label>
         <input type="text" class="form-control" id="edit_fname" name="fname" value="{{ $employee->fname }}" required>
@@ -45,4 +52,5 @@
         </select>
     </div>
     <button type="submit" class="btn btn-primary">Update Employee</button>
+    <span id="edit-loading" class="htmx-indicator">Loading...</span>
 </form>

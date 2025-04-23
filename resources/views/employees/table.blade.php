@@ -8,16 +8,23 @@
                hx-swap="innerHTML" 
                hx-trigger="input delay:500ms" 
                name="search" 
-               value="{{ $search }}">
+               value="{{ $search ?? '' }}">
     </div>
     @if (session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
+        <div class="alert alert-success alert-dismissible" id="success-message">
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            {{ session('success') }}
+        </div>
     @endif
     @if (session('error'))
-        <div class="alert alert-danger">{{ session('error') }}</div>
+        <div class="alert alert-danger alert-dismissible" id="error-message">
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            {{ session('error') }}
+        </div>
     @endif
     @if (isset($errors) && $errors->any())
-        <div class="alert alert-danger">
+        <div class="alert alert-danger alert-dismissible" id="error-message">
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             <ul>
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
@@ -25,6 +32,10 @@
             </ul>
         </div>
     @endif
+    <div id="fallback-error" class="alert alert-danger alert-dismissible" style="display: none;">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        An unexpected error occurred. Please try again.
+    </div>
     <div class="table-responsive">
         <table class="table table-bordered">
             <thead>
@@ -56,11 +67,14 @@
                             <form hx-post="{{ route('employees.archive', $employee->employee_id) }}" 
                                   hx-target="#employees-section" 
                                   hx-swap="innerHTML" 
+                                  hx-push-url="false"
                                   hx-headers='{"X-CSRF-TOKEN": "{{ csrf_token() }}"}' 
+                                  hx-indicator="#archive-loading-{{ $employee->employee_id }}"
                                   style="display:inline;">
                                 @csrf
                                 <button type="submit" class="btn btn-sm btn-warning" 
                                         onclick="return confirm('Are you sure you want to archive this employee?')">Archive</button>
+                                <span id="archive-loading-{{ $employee->employee_id }}" class="htmx-indicator">Loading...</span>
                             </form>
                         </td>
                     </tr>
@@ -74,7 +88,7 @@
     </div>
     <nav aria-label="Page navigation">
         <ul class="pagination">
-            {{ $employees->appends(['search' => $search])->links() }}
+            {{ $employees->appends(['search' => $search ?? ''])->links() }}
         </ul>
     </nav>
 </div>

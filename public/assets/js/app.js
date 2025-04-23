@@ -101,72 +101,45 @@ document.addEventListener('DOMContentLoaded', function () {
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
             });
-            
-            // Clear any error messages
+    
+            // Clear error messages
             const errorContainer = document.getElementById('error-message');
-            if (errorContainer) errorContainer.innerHTML = '';
+            if (errorContainer) errorContainer.style.display = 'none';
+            const fallbackError = document.getElementById('fallback-error');
+            if (fallbackError) fallbackError.style.display = 'none';
+    
+            // Show success message for edit form
+            if (e.target.id === 'editEmployeeForm') {
+                const successContainer = document.getElementById('success-message');
+                if (successContainer) {
+                    successContainer.style.display = 'block';
+                    setTimeout(() => {
+                        successContainer.style.display = 'none';
+                    }, 3000);
+                }
+            }
         }
-    if (isFormRequest && e.detail.successful) {
-        // Close all modals
-        document.querySelectorAll('.modal').forEach(modalEl => {
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
-        });
-        
-        // Clear any error messages
-        const errorContainer = document.getElementById('error-message');
-        if (errorContainer) errorContainer.innerHTML = '';
-    }
-        if (isFormRequest) {
-            if (e.detail.successful) {
-                const modalId = e.target.id.includes('Employee') ? 'addEmployeeModal' : 'addPositionModal';
-                const modalElement = document.getElementById(modalId);
-                if (modalElement) {
-                    const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
-                    modal.hide();
-                    console.log(`Closed modal: ${modalId}`);
-                } else if (!isDeleteForm) {
-                    console.error(`Modal ${modalId} not found`);
-                }
-                const errorContainer = document.getElementById('error-message');
-                if (errorContainer) errorContainer.innerHTML = '';
-            } else {
-                console.error(`HTMX request failed for ${e.target.id || 'unknown form'}:`, e.detail.xhr.status, e.detail.xhr.responseText);
-                const errorContainer = document.getElementById('error-message') || document.createElement('div');
-                if (!errorContainer.id) {
-                    errorContainer.id = 'error-message';
-                    errorContainer.className = 'alert alert-danger';
-                    document.querySelector('#content-area').prepend(errorContainer);
-                }
-                let errorMessage = 'An error occurred. Please try again.';
+    
+        if (isFormRequest && !e.detail.successful) {
+            console.error(`HTMX request failed for ${e.target.id || 'unknown form'}:`, e.detail.xhr.status, e.detail.xhr.responseText);
+            const errorContainer = document.getElementById('error-message') || document.getElementById('fallback-error');
+            if (errorContainer) {
+                let errorMessage = 'An unexpected error occurred. Please try again.';
                 if (e.detail.xhr.status === 422) {
-                    errorMessage = e.detail.xhr.responseText.match(/<div[^>]*error[^>]*>([^<]*)<\/div>/)?.[1] || 'Validation error occurred';
+                    errorMessage = e.detail.xhr.responseText.match(/<li[^>]*>([^<]*)<\/li>/)?.[1] || 'Validation error occurred';
                 } else if (e.detail.xhr.status === 500) {
-                    errorMessage = e.detail.xhr.responseText.match(/<div[^>]*error[^>]*>([^<]*)<\/div>/)?.[1] || 'Server error occurred. Please try again later.';
+                    errorMessage = e.detail.xhr.responseText.match(/<div[^>]*alert-danger[^>]*>([^<]*)<\/div>/)?.[1] || 'Server error occurred. Please try again later.';
                 }
-                errorContainer.style.display = 'block';
                 errorContainer.innerHTML = errorMessage;
-            }
-        } else {
-            // Handle non-form requests (e.g., navigation links)
-            if (!e.detail.successful) {
-                console.error(`HTMX request failed for ${e.detail.path}:`, e.detail.xhr.status, e.detail.xhr.responseText);
-                const errorContainer = document.getElementById('error-message') || document.createElement('div');
-                if (!errorContainer.id) {
-                    errorContainer.id = 'error-message';
-                    errorContainer.className = 'alert alert-danger';
-                    document.querySelector('#content-area').prepend(errorContainer);
-                }
-                let errorMessage = e.detail.xhr.status === 500 ? 'Server error occurred. Please try again later.' : 'Request failed.';
                 errorContainer.style.display = 'block';
-                errorContainer.innerHTML = errorMessage;
             }
         }
+    
         // Reset navigation state
-        if (isNavigating) {
+        if (typeof isNavigating !== 'undefined' && isNavigating) {
             isNavigating = false;
             console.log('Navigation completed, isNavigating reset, states:', { isNavigating, isSidebarToggled });
-            if (!isSidebarToggled && !isSidebarHovered && sidebar) {
+            if (typeof isSidebarToggled !== 'undefined' && !isSidebarToggled && typeof isSidebarHovered !== 'undefined' && !isSidebarHovered && sidebar) {
                 sidebar.classList.remove('visible');
                 console.log('Sidebar hidden after navigation, states:', { isHamburgerHovered, isSidebarHovered, isSidebarToggled, isNavigating });
             }
