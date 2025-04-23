@@ -86,12 +86,12 @@ class EmployeeController extends Controller
              File::makeDirectory(public_path('qr_codes'), 0755, true);
          }
  
-         $qrCode = QrCode::create($qrCodeString)
-             ->setEncoding(new Encoding('UTF-8'))
-             ->setSize(300)
-             ->setMargin(10)
-             ->setForegroundColor(new Color(0, 0, 0))
-             ->setBackgroundColor(new Color(255, 255, 255));
+         $qrCode = new QrCode($qrCodeString);
+         $qrCode->setEncoding(new Encoding('UTF-8'));
+         $qrCode->setSize(300);
+         $qrCode->setMargin(10);
+         $qrCode->setForegroundColor(new Color(0, 0, 0));
+         $qrCode->setBackgroundColor(new Color(255, 255, 255));
  
          $writer = new PngWriter();
          $result = $writer->write($qrCode);
@@ -114,7 +114,6 @@ class EmployeeController extends Controller
          ], 500);
      }
  }
-
     public function show($id)
     {
         try {

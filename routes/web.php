@@ -4,9 +4,10 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\PositionController;
 use Illuminate\Support\Facades\Route;
-use Endroid\QrCode\Builder\Builder;
+use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
-
+use Endroid\QrCode\Color\Color;
+use Endroid\QrCode\Encoding\Encoding;
 Route::get('/', fn() => redirect('/dashboard'));
 
 Route::prefix('dashboard')->group(function () {
@@ -45,21 +46,23 @@ Route::get('/check-db', function() {
 Route::get('/test-qr', function() {
     try {
         // Create QR code
-        $qrCode = QrCode::create('TEST')
-            ->setEncoding(new Encoding('UTF-8'))
-            ->setSize(300)
-            ->setMargin(10)
-            ->setForegroundColor(new Color(0, 0, 0))
-            ->setBackgroundColor(new Color(255, 255, 255));
+        $qrCode = new QrCode('TEST');
+        $qrCode->setEncoding(new Encoding('UTF-8'));
+        $qrCode->setSize(300);
+        $qrCode->setMargin(10);
+        $qrCode->setForegroundColor(new Color(0, 0, 0));
+        $qrCode->setBackgroundColor(new Color(255, 255, 255));
 
         $writer = new PngWriter();
         $result = $writer->write($qrCode);
         
         // Save to file
-        $result->saveToFile(public_path('qr_codes/test.png'));
+        $filePath = public_path('qr_codes/test.png');
+        $result->saveToFile($filePath);
         
-        return response()->file(public_path('qr_codes/test.png'));
+        return response()->file($filePath);
     } catch (\Exception $e) {
+        \Log::error('QR Test Failed: '.$e->getMessage());
         return response()->json([
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString()
