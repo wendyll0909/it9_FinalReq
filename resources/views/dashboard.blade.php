@@ -61,11 +61,7 @@
                         <i class="bi bi-clock-fill"></i> Overtime Requests
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a href="#" class="nav-link" hx-get="{{ url('/dashboard/schedules') }}" hx-target="#content-area" hx-swap="innerHTML" data-persist-sidebar>
-                        <i class="bi bi-calendar-week-fill"></i> Schedules
-                    </a>
-                </li>
+                
                 <li class="nav-item">
                     <a href="#" class="nav-link" hx-get="{{ url('/dashboard/reports') }}" hx-target="#content-area" hx-swap="innerHTML" data-persist-sidebar>
                         <i class="bi bi-file-earmark-text-fill"></i> Attendance Reports
