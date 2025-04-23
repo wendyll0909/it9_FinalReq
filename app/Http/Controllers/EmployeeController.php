@@ -61,84 +61,81 @@ class EmployeeController extends Controller
         }
     }
 
-    public function store(Request $request)
-    {
-        try {
-            Log::info('Employee store attempt', ['request_data' => $request->all()]);
-            DB::enableQueryLog();
-
-            $validator = Validator::make($request->all(), [
-                'fname' => 'required|string|max:255',
-                'mname' => 'nullable|string|max:255',
-                'lname' => 'required|string|max:255',
-                'address' => 'required|string',
-                'contact' => 'required|string|max:255',
-                'hire_date' => 'required|date',
-                'position_id' => 'required|exists:positions,position_id'
-            ]);
-
-            if ($validator->fails()) {
-                Log::error('Employee validation failed', ['errors' => $validator->errors()->toArray()]);
-                return response()->view('employees.table', [
-                    'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $qrCodeString = uniqid('emp_');
-            $qrCodePath = 'qr_codes/' . $qrCodeString . '.png';
-
-            $directory = public_path('qr_codes');
-            if (!File::exists($directory)) {
-                File::makeDirectory($directory, 0755, true);
-                Log::info('Created qr_codes directory', ['path' => $directory]);
-            }
-
-            try {
-                $qrCode = QrCode::create($qrCodeString)
-                    ->setSize(300)
-                    ->setMargin(10);
-                $writer = new PngWriter();
-                $result = $writer->write($qrCode);
-                $result->saveToFile(public_path($qrCodePath));
-                Log::info('QR code generated', ['qr_code' => $qrCodeString, 'path' => $qrCodePath]);
-            } catch (\Exception $e) {
-                Log::error('QR code generation failed', [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-                return response()->view('employees.table', [
-                    'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
-                    'error' => 'Failed to generate QR code: ' . $e->getMessage()
-                ], 500);
-            }
-
-            $employee = Employee::create(array_merge(
-                $request->only(['fname', 'mname', 'lname', 'address', 'contact', 'hire_date', 'position_id']),
-                ['qr_code' => $qrCodeString, 'status' => 'active']
-            ));
-
-            Log::info('Employee created', [
-                'employee_id' => $employee->employee_id,
-                'queries' => DB::getQueryLog()
-            ]);
-
-            $employees = Employee::with('position')->where('status', 'active')->paginate(10);
-            return response()->view('employees.table', compact('employees'))
-                ->with('success', 'Employee added successfully');
-        } catch (\Exception $e) {
-            Log::error('Employee store failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all(),
-                'queries' => DB::getQueryLog()
-            ]);
-            return response()->view('employees.table', [
-                'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
-                'error' => 'Failed to add employee: ' . $e->getMessage()
-            ], 500);
-        }
-    }
+   // In EmployeeController.php
+   public function store(Request $request)
+   {
+       try {
+           $validator = Validator::make($request->all(), [
+               'fname' => 'required|string|max:255',
+               'mname' => 'nullable|string|max:255',
+               'lname' => 'required|string|max:255',
+               'address' => 'required|string',
+               'contact' => 'required|string|max:255',
+               'hire_date' => 'required|date',
+               'position_id' => 'required|exists:positions,position_id'
+           ]);
+   
+           if ($validator->fails()) {
+               return response()->view('employees.table', [
+                   'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
+                   'errors' => $validator->errors()
+               ], 422);
+           }
+   
+           // Debug: Log request data
+           \Log::debug('Employee creation attempt', $request->all());
+   
+           // QR Code generation
+           $qrCodeString = uniqid('emp_');
+           $qrCodePath = 'qr_codes/' . $qrCodeString . '.png';
+           
+           // Ensure directory exists
+           if (!File::exists(public_path('qr_codes'))) {
+               File::makeDirectory(public_path('qr_codes'), 0755, true);
+           }
+   
+           // Generate QR code
+           try {
+               $qrCode = QrCode::create($qrCodeString)
+                   ->setSize(300)
+                   ->setMargin(10);
+               $writer = new PngWriter();
+               $result = $writer->write($qrCode);
+               $result->saveToFile(public_path($qrCodePath));
+           } catch (\Exception $e) {
+               \Log::error('QR Code generation failed', ['error' => $e->getMessage()]);
+               throw $e;
+           }
+   
+           // Create employee
+           $employee = Employee::create([
+               'fname' => $request->fname,
+               'mname' => $request->mname,
+               'lname' => $request->lname,
+               'address' => $request->address,
+               'contact' => $request->contact,
+               'hire_date' => $request->hire_date,
+               'position_id' => $request->position_id,
+               'qr_code' => $qrCodeString,
+               'status' => 'active'
+           ]);
+   
+           return response()->view('employees.table', [
+               'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
+               'success' => 'Employee added successfully'
+           ]);
+   
+       } catch (\Exception $e) {
+           \Log::error('Employee creation failed', [
+               'error' => $e->getMessage(),
+               'trace' => $e->getTraceAsString()
+           ]);
+           return response()->view('employees.table', [
+               'employees' => Employee::with('position')->where('status', 'active')->paginate(10),
+               'error' => 'Failed to add employee: ' . $e->getMessage()
+           ], 500);
+       }
+   }
 
     public function show($id)
     {

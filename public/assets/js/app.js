@@ -94,7 +94,29 @@ document.addEventListener('DOMContentLoaded', function () {
         const formIds = ['addEmployeeForm', 'editEmployeeForm', 'addPositionForm', 'editPositionForm'];
         const isDeleteForm = e.target && e.target.id && e.target.id.startsWith('deletePositionForm_');
         const isFormRequest = e.target && e.target.id && (formIds.includes(e.target.id) || isDeleteForm);
-
+    
+        if (isFormRequest && e.detail.successful) {
+            // Close all modals
+            document.querySelectorAll('.modal').forEach(modalEl => {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            });
+            
+            // Clear any error messages
+            const errorContainer = document.getElementById('error-message');
+            if (errorContainer) errorContainer.innerHTML = '';
+        }
+    if (isFormRequest && e.detail.successful) {
+        // Close all modals
+        document.querySelectorAll('.modal').forEach(modalEl => {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        });
+        
+        // Clear any error messages
+        const errorContainer = document.getElementById('error-message');
+        if (errorContainer) errorContainer.innerHTML = '';
+    }
         if (isFormRequest) {
             if (e.detail.successful) {
                 const modalId = e.target.id.includes('Employee') ? 'addEmployeeModal' : 'addPositionModal';
