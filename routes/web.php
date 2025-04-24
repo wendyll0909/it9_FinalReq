@@ -42,6 +42,7 @@ Route::get('/check-db', function() {
         return $e->getMessage();
     }
 });
+Route::get('/qr_codes/{code}.png', [EmployeeController::class, 'serveQrCode'])->name('qr.serve');
 
 Route::get('/test-qr', function() {
     try {

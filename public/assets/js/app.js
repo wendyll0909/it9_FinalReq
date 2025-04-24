@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let isHamburgerHovered = false;
     let isNavigating = false;
     let dropdownTimeout;
+    let currentQrCode = null; // Store the current QR code for downloading
 
     // Log missing elements for debugging
     if (!sidebar) console.warn('Sidebar element not found');
@@ -149,6 +150,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.body.addEventListener('click', function (e) {
         if (e.target.classList.contains('view-qr')) {
             const qrCode = e.target.getAttribute('data-qr');
+            currentQrCode = qrCode; // Store the QR code for downloading
             console.log('View QR clicked', { qrCode });
             const qrModal = new bootstrap.Modal(document.getElementById('viewQrModal'));
             const qrImage = document.getElementById('qrImage');
@@ -181,6 +183,23 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // Handle modal "Download QR" button
+    const downloadQrButton = document.getElementById('downloadQrButton');
+    if (downloadQrButton) {
+        downloadQrButton.addEventListener('click', function () {
+            if (currentQrCode) {
+                downloadQR(currentQrCode);
+            } else {
+                console.error('No QR code selected for download');
+                const errorContainer = document.getElementById('fallback-error');
+                if (errorContainer) {
+                    errorContainer.innerHTML = 'No QR code available to download.';
+                    errorContainer.style.display = 'block';
+                }
+            }
+        });
+    }
+
     const addEmployeeModal = document.getElementById('addEmployeeModal');
     if (addEmployeeModal) {
         addEmployeeModal.addEventListener('shown.bs.modal', function () {
@@ -194,11 +213,27 @@ document.addEventListener('DOMContentLoaded', function () {
         console.warn('Add employee modal not found');
     }
 
-    function downloadQR() {
-        const qrImage = document.getElementById('qrImage');
-        const link = document.createElement('a');
-        link.href = qrImage.src;
-        link.download = 'employee_qr_code.png';
-        link.click();
+    // Download QR code function
+    function downloadQR(qrCode) {
+        try {
+            if (!qrCode) {
+                throw new Error('QR code is not provided');
+            }
+            const url = `/qr_codes/${qrCode}.png`; // Server-side QR code image
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `qr_code_${qrCode}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            console.log('QR code downloaded:', qrCode);
+        } catch (error) {
+            console.error('Error in downloadQR:', error);
+            const errorContainer = document.getElementById('fallback-error');
+            if (errorContainer) {
+                errorContainer.innerHTML = 'An unexpected error occurred while downloading the QR code.';
+                errorContainer.style.display = 'block';
+            }
+        }
     }
 });

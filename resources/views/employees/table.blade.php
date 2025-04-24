@@ -56,12 +56,12 @@
                         <td>{{ $employee->contact }}</td>
                         <td>{{ $employee->hire_date }}</td>
                         <td>
-                            @if ($employee->qr_code)
-                                <button class="btn btn-sm btn-info view-qr" data-qr="{{ $employee->qr_code }}">View QR</button>
-                            @else
-                                N/A
-                            @endif
-                        </td>
+    @if ($employee->qr_code)
+        <button class="btn btn-sm btn-info view-qr" data-qr="{{ $employee->qr_code }}">View QR</button>
+    @else
+        N/A
+    @endif
+</td>
                         <td>
                             <button class="btn btn-sm btn-primary edit-employee" data-id="{{ $employee->employee_id }}">Edit</button>
                             <form hx-post="{{ route('employees.archive', $employee->employee_id) }}" 
