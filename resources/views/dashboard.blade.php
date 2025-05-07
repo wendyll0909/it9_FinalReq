@@ -47,9 +47,21 @@
                     </ul>
                 </li>
                 <li class="nav-item">
-                    <a href="#" class="nav-link" hx-get="{{ url('/dashboard/attendance') }}" hx-target="#content-area" hx-swap="innerHTML" data-persist-sidebar>
+                    <a href="#" class="nav-link" data-toggle-dropdown>
                         <i class="bi bi-calendar2-plus-fill"></i> Record Attendance
                     </a>
+                    <ul class="attendance-dropdown" style="display: none;">
+                        <li>
+                            <a href="#" class="nav-link dropdown-link" hx-get="{{ route('attendance.checkin') }}" hx-target="#content-area" hx-swap="innerHTML" data-persist-sidebar>
+                                Check In
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-link dropdown-link" hx-get="{{ route('attendance.checkout') }}" hx-target="#content-area" hx-swap="innerHTML" data-persist-sidebar>
+                                Check Out
+                            </a>
+                        </li>
+                    </ul>
                 </li>
                 <li class="nav-item">
                     <a href="#" class="nav-link" hx-get="{{ url('/dashboard/leave-requests') }}" hx-target="#content-area" hx-swap="innerHTML" data-persist-sidebar>
@@ -59,11 +71,6 @@
                 <li class="nav-item">
                     <a href="#" class="nav-link" hx-get="{{ url('/dashboard/overtime-requests') }}" hx-target="#content-area" hx-swap="innerHTML" data-persist-sidebar>
                         <i class="bi bi-clock-fill"></i> Overtime Requests
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="#" class="nav-link" hx-get="{{ url('/dashboard/schedules') }}" hx-target="#content-area" hx-swap="innerHTML" data-persist-sidebar>
-                        <i class="bi bi-calendar-week-fill"></i> Schedules
                     </a>
                 </li>
                 <li class="nav-item">
@@ -206,23 +213,38 @@
         </div>
     </div>
 
-  <!-- View QR Code Modal -->
-<div class="modal fade" id="viewQrModal" tabindex="-1" aria-labelledby="viewQrModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="viewQrModalLabel">Employee QR Code</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-center">
-                <img id="qrImage" src="" alt="QR Code" class="img-fluid" style="max-width: 100%; height: auto;">
-                <div class="mt-3">
-                    <button class="btn btn-primary" id="downloadQrButton">Download QR Code</button>
+    <!-- View QR Code Modal -->
+    <div class="modal fade" id="viewQrModal" tabindex="-1" aria-labelledby="viewQrModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewQrModalLabel">Employee QR Code</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="qrImage" src="" alt="QR Code" class="img-fluid" style="max-width: 100%; height: auto;">
+                    <div class="mt-3">
+                        <button class="btn btn-primary" id="downloadQrButton">Download QR Code</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- Edit Attendance Modal -->
+    <div class="modal fade" id="editAttendanceModal" tabindex="-1" aria-labelledby="editAttendanceModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editAttendanceModalLabel">Edit Attendance</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="edit-attendance-form">
+                    <p>Loading attendance data...</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ asset('assets/js/app.js') }}"></script>

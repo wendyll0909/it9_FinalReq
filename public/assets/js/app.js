@@ -8,9 +8,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let isHamburgerHovered = false;
     let isNavigating = false;
     let dropdownTimeout;
-    let currentQrCode = null; // Store the current QR code for downloading
+    let currentQrCode = null;
 
-    // Log missing elements for debugging
     if (!sidebar) console.warn('Sidebar element not found');
     if (!hamburgerMenu) console.warn('Hamburger menu element not found');
     if (!contentArea) console.warn('Content area element not found');
@@ -76,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const isVisible = dropdown.style.display === 'block';
             console.log('Dropdown toggle clicked', { toggle: this.textContent, isVisible });
 
-            document.querySelectorAll('.employee-dropdown').forEach(menu => {
+            document.querySelectorAll('.employee-dropdown, .attendance-dropdown').forEach(menu => {
                 menu.style.display = 'none';
             });
 
@@ -92,25 +91,22 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.body.addEventListener('htmx:afterRequest', function(e) {
-        const formIds = ['addEmployeeForm', 'editEmployeeForm', 'addPositionForm', 'editPositionForm'];
-        const isDeleteForm = e.target && e.target.id && e.target.id.startsWith('deletePositionForm_');
+        const formIds = ['addEmployeeForm', 'editEmployeeForm', 'addPositionForm', 'editPositionForm', 'editAttendanceForm'];
+        const isDeleteForm = e.target && e.target.id && (e.target.id.startsWith('deletePositionForm_') || e.target.id.startsWith('deleteAttendanceForm_'));
         const isFormRequest = e.target && e.target.id && (formIds.includes(e.target.id) || isDeleteForm);
     
         if (isFormRequest && e.detail.successful) {
-            // Close all modals
             document.querySelectorAll('.modal').forEach(modalEl => {
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
             });
     
-            // Clear error messages
             const errorContainer = document.getElementById('error-message');
             if (errorContainer) errorContainer.style.display = 'none';
             const fallbackError = document.getElementById('fallback-error');
             if (fallbackError) fallbackError.style.display = 'none';
     
-            // Show success message for edit form
-            if (e.target.id === 'editEmployeeForm') {
+            if (e.target.id === 'editEmployeeForm' || e.target.id === 'editAttendanceForm') {
                 const successContainer = document.getElementById('success-message');
                 if (successContainer) {
                     successContainer.style.display = 'block';
@@ -136,7 +132,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     
-        // Reset navigation state
         if (typeof isNavigating !== 'undefined' && isNavigating) {
             isNavigating = false;
             console.log('Navigation completed, isNavigating reset, states:', { isNavigating, isSidebarToggled });
@@ -150,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.body.addEventListener('click', function (e) {
         if (e.target.classList.contains('view-qr')) {
             const qrCode = e.target.getAttribute('data-qr');
-            currentQrCode = qrCode; // Store the QR code for downloading
+            currentQrCode = qrCode;
             console.log('View QR clicked', { qrCode });
             const qrModal = new bootstrap.Modal(document.getElementById('viewQrModal'));
             const qrImage = document.getElementById('qrImage');
@@ -158,36 +153,9 @@ document.addEventListener('DOMContentLoaded', function () {
             qrModal.show();
         }
 
-        if (e.target.classList.contains('edit-employee')) {
-            const employeeId = e.target.getAttribute('data-id');
-            console.log('Edit employee clicked', { employeeId });
-            htmx.ajax('GET', `/dashboard/employees/${employeeId}`, {
-                target: '#editEmployeeModal .modal-body',
-                swap: 'innerHTML'
-            }).then(() => {
-                const editModal = new bootstrap.Modal(document.getElementById('editEmployeeModal'));
-                editModal.show();
-            });
-        }
-
-        if (e.target.classList.contains('edit-position')) {
-            const positionId = e.target.getAttribute('data-id');
-            console.log('Edit position clicked', { positionId });
-            htmx.ajax('GET', `/dashboard/positions/${positionId}`, {
-                target: '#editPositionModal .modal-body',
-                swap: 'innerHTML'
-            }).then(() => {
-                const editModal = new bootstrap.Modal(document.getElementById('editPositionModal'));
-                editModal.show();
-            });
-        }
-    });
-
-    // Handle modal "Download QR" button
-    const downloadQrButton = document.getElementById('downloadQrButton');
-    if (downloadQrButton) {
-        downloadQrButton.addEventListener('click', function () {
+        if (e.target.id === 'downloadQrButton') {
             if (currentQrCode) {
+                console.log('Download QR button clicked', { currentQrCode });
                 downloadQR(currentQrCode);
             } else {
                 console.error('No QR code selected for download');
@@ -197,43 +165,39 @@ document.addEventListener('DOMContentLoaded', function () {
                     errorContainer.style.display = 'block';
                 }
             }
-        });
-    }
-
-    const addEmployeeModal = document.getElementById('addEmployeeModal');
-    if (addEmployeeModal) {
-        addEmployeeModal.addEventListener('shown.bs.modal', function () {
-            console.log('Add employee modal shown');
-            htmx.ajax('GET', '/dashboard/positions/list', {
-                target: '#addEmployeeModal select[name="position_id"]',
-                swap: 'innerHTML'
-            });
-        });
-    } else {
-        console.warn('Add employee modal not found');
-    }
-
-    // Download QR code function
-    function downloadQR(qrCode) {
-        try {
-            if (!qrCode) {
-                throw new Error('QR code is not provided');
-            }
-            const url = `/qr_codes/${qrCode}.png`; // Server-side QR code image
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `qr_code_${qrCode}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            console.log('QR code downloaded:', qrCode);
-        } catch (error) {
-            console.error('Error in downloadQR:', error);
-            const errorContainer = document.getElementById('fallback-error');
-            if (errorContainer) {
-                errorContainer.innerHTML = 'An unexpected error occurred while downloading the QR code.';
-                errorContainer.style.display = 'block';
-            }
         }
+        
+    });
+
+    const viewQrModal = document.getElementById('viewQrModal');
+    if (viewQrModal) {
+        viewQrModal.addEventListener('hidden.bs.modal', () => {
+            currentQrCode = null;
+            console.log('QR modal hidden, currentQrCode reset');
+            const qrImage = document.getElementById('qrImage');
+            if (qrImage) qrImage.src = '';
+        });
     }
 });
+function downloadQR(qrCode) {
+    try {
+        if (!qrCode) {
+            throw new Error('QR code is not provided');
+        }
+        const url = `/qr_codes/${qrCode}.png`;
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `qr_code_${qrCode}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log('QR code downloaded:', qrCode);
+    } catch (error) {
+        console.error('Error in downloadQR:', error);
+        const errorContainer = document.getElementById('fallback-error');
+        if (errorContainer) {
+            errorContainer.innerHTML = 'An unexpected error occurred while downloading the QR code.';
+            errorContainer.style.display = 'block';
+        }
+    }
+}

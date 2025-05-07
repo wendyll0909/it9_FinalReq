@@ -3,11 +3,13 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\PositionController;
+use App\Http\Controllers\AttendanceController;
 use Illuminate\Support\Facades\Route;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
 use Endroid\QrCode\Color\Color;
 use Endroid\QrCode\Encoding\Encoding;
+
 Route::get('/', fn() => redirect('/dashboard'));
 
 Route::prefix('dashboard')->group(function () {
@@ -22,14 +24,24 @@ Route::prefix('dashboard')->group(function () {
     // Position routes
     Route::get('positions/list', [PositionController::class, 'list'])->name('positions.list');
     Route::resource('positions', PositionController::class);
+    
+    // Attendance routes
+    Route::get('attendance/checkin', [AttendanceController::class, 'checkin'])->name('attendance.checkin');
+    Route::post('attendance/checkin', [AttendanceController::class, 'storeCheckin'])->name('attendance.checkin.store');
+    Route::get('attendance/checkout', [AttendanceController::class, 'checkout'])->name('attendance.checkout');
+    Route::post('attendance/checkout', [AttendanceController::class, 'storeCheckout'])->name('attendance.checkout.store');
+    Route::get('attendance/{id}/edit', [AttendanceController::class, 'edit'])->name('attendance.edit');
+    Route::put('attendance/{id}', [AttendanceController::class, 'update'])->name('attendance.update');
+    Route::delete('attendance/{id}', [AttendanceController::class, 'destroy'])->name('attendance.destroy');
 });
+
 Route::get('/debug-schema', function() {
     return response()->json([
         'employees_columns' => Schema::getColumnListing('employees'),
         'positions_columns' => Schema::getColumnListing('positions')
     ]);
 });
-// routes/web.php
+
 Route::get('/check-db', function() {
     try {
         return response()->json([
@@ -42,6 +54,7 @@ Route::get('/check-db', function() {
         return $e->getMessage();
     }
 });
+
 Route::get('/qr_codes/{code}.png', [EmployeeController::class, 'serveQrCode'])->name('qr.serve');
 
 Route::get('/test-qr', function() {
