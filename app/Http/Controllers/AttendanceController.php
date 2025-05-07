@@ -5,12 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Attendance;
 use App\Models\Employee;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
-use Intervention\Image\Facades\Image;
-use Endroid\QrCode\QrCode;
-use Endroid\QrCode\Reader\QrCodeReader;
 
 class AttendanceController extends Controller
 {
@@ -19,9 +15,9 @@ class AttendanceController extends Controller
         try {
             $today = now()->toDateString();
             $checkins = Attendance::with('employee')
-                ->where('date', $today)
+                ->whereDate('date', $today)
                 ->whereNotNull('check_in_time')
-                ->orderBy('check_in_time', 'desc')
+                ->orderByDesc('check_in_time')
                 ->get();
             return view('attendance.checkin', compact('checkins'));
         } catch (\Exception $e) {
@@ -38,73 +34,98 @@ class AttendanceController extends Controller
 
     public function storeCheckin(Request $request)
     {
-        DB::beginTransaction();
         try {
-            $validator = Validator::make($request->all(), [
-                'employee_id' => 'required_without:qr_code|exists:employees,employee_id',
-                'qr_code' => 'required_without:employee_id|string',
-                'method' => 'required|in:qr_camera,qr_upload,manual'
+            Log::debug('Received check-in request', [
+                'input' => $request->all(),
+                'content_type' => $request->header('Content-Type')
             ]);
 
-            if ($validator->fails()) {
-                return response()->view('attendance.checkin', [
-                    'checkins' => Attendance::with('employee')->where('date', now()->toDateString())->get(),
-                    'errors' => $validator->errors()
-                ], 422);
-            }
+            DB::beginTransaction();
+
+            $request->validate([
+                'employee_id' => 'nullable|exists:employees,employee_id',
+                'qr_code' => 'nullable|string',
+                'method' => 'required|in:manual,qr_camera,qr_upload'
+            ]);
 
             $employee = null;
-            if ($request->has('qr_code')) {
-                $qrCode = $request->input('qr_code');
-                $employee = Employee::where('qr_code', $qrCode)->first();
-                if (!$employee) {
-                    return response()->view('attendance.checkin', [
-                        'checkins' => Attendance::with('employee')->where('date', now()->toDateString())->get(),
-                        'error' => 'Invalid QR code'
-                    ], 422);
-                }
-            } else {
-                $employee = Employee::findOrFail($request->employee_id);
+            if ($request->filled('employee_id')) {
+                $employee = Employee::find($request->employee_id);
+            } elseif ($request->filled('qr_code')) {
+                $employee = Employee::where('qr_code', $request->qr_code)->first();
+            }
+
+            if (!$employee || $employee->status !== 'active') {
+                Log::warning('Check-in failed: employee not found or inactive', [
+                    'employee_id' => $request->employee_id,
+                    'qr_code' => $request->qr_code
+                ]);
+                return response()->view('attendance.checkin', [
+                    'checkins' => Attendance::with('employee')
+                        ->whereDate('date', now()->toDateString())
+                        ->whereNotNull('check_in_time')
+                        ->orderByDesc('check_in_time')
+                        ->get(),
+                    'error' => 'Employee not found or inactive'
+                ], 404);
             }
 
             $today = now()->toDateString();
-            $existing = Attendance::where('employee_id', $employee->employee_id)
-                ->where('date', $today)
+            $existingCheckin = Attendance::where('employee_id', $employee->employee_id)
+                ->whereDate('date', $today)
                 ->first();
 
-            if ($existing && $existing->check_in_time) {
-                return response()->view('attendance.checkin', [
-                    'checkins' => Attendance::with('employee')->where('date', $today)->get(),
-                    'error' => 'Employee already checked in today'
-                ], 422);
-            }
-
-            if (!$existing) {
-                $existing = Attendance::create([
+            if ($existingCheckin) {
+                Log::info('Duplicate check-in attempt', [
                     'employee_id' => $employee->employee_id,
-                    'date' => $today,
+                    'date' => $today
                 ]);
+                return response()->view('attendance.checkin', [
+                    'checkins' => Attendance::with('employee')
+                        ->whereDate('date', now()->toDateString())
+                        ->whereNotNull('check_in_time')
+                        ->orderByDesc('check_in_time')
+                        ->get(),
+                    'error' => 'Employee already checked in today'
+                ], 409);
             }
 
-            $existing->update([
+            $attendance = Attendance::create([
+                'employee_id' => $employee->employee_id,
+                'date' => $today,
                 'check_in_time' => now()->toTimeString(),
-                'check_in_method' => $request->method
+                'check_in_method' => $request->method,
             ]);
 
             DB::commit();
+
+            Log::info('Check-in successful', [
+                'employee_id' => $employee->employee_id,
+                'attendance_id' => $attendance->attendance_id,
+            ]);
+
             return response()->view('attendance.checkin', [
-                'checkins' => Attendance::with('employee')->where('date', $today)->get(),
+                'checkins' => Attendance::with('employee')
+                    ->whereDate('date', now()->toDateString())
+                    ->whereNotNull('check_in_time')
+                    ->orderByDesc('check_in_time')
+                    ->get(),
                 'success' => 'Check-in recorded successfully'
             ]);
+
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Check-in store failed', [
+            Log::error('Check-in failed due to exception', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
             return response()->view('attendance.checkin', [
-                'checkins' => Attendance::with('employee')->where('date', now()->toDateString())->get(),
-                'error' => 'Failed to record check-in: ' . $e->getMessage()
+                'checkins' => Attendance::with('employee')
+                    ->whereDate('date', now()->toDateString())
+                    ->whereNotNull('check_in_time')
+                    ->orderByDesc('check_in_time')
+                    ->get(),
+                'error' => 'An error occurred during check-in: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -114,9 +135,9 @@ class AttendanceController extends Controller
         try {
             $today = now()->toDateString();
             $checkouts = Attendance::with('employee')
-                ->where('date', $today)
+                ->whereDate('date', $today)
                 ->whereNotNull('check_out_time')
-                ->orderBy('check_out_time', 'desc')
+                ->orderByDesc('check_out_time')
                 ->get();
             return view('attendance.checkout', compact('checkouts'));
         } catch (\Exception $e) {
@@ -133,50 +154,66 @@ class AttendanceController extends Controller
 
     public function storeCheckout(Request $request)
     {
-        DB::beginTransaction();
         try {
-            $validator = Validator::make($request->all(), [
+            Log::debug('Received check-out request', [
+                'input' => $request->all(),
+                'content_type' => $request->header('Content-Type')
+            ]);
+
+            DB::beginTransaction();
+
+            $request->validate([
                 'employee_id' => 'required_without:qr_code|exists:employees,employee_id',
                 'qr_code' => 'required_without:employee_id|string',
                 'method' => 'required|in:qr_camera,qr_upload,manual'
             ]);
 
-            if ($validator->fails()) {
-                return response()->view('attendance.checkout', [
-                    'checkouts' => Attendance::with('employee')->where('date', now()->toDateString())->get(),
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
             $employee = null;
             if ($request->has('qr_code')) {
-                $qrCode = $request->input('qr_code');
-                $employee = Employee::where('qr_code', $qrCode)->first();
-                if (!$employee) {
+                $employee = Employee::where('qr_code', $request->input('qr_code'))->first();
+                if (!$employee || $employee->status !== 'active') {
                     return response()->view('attendance.checkout', [
-                        'checkouts' => Attendance::with('employee')->where('date', now()->toDateString())->get(),
-                        'error' => 'Invalid QR code'
+                        'checkouts' => Attendance::with('employee')
+                            ->whereDate('date', now()->toDateString())
+                            ->whereNotNull('check_out_time')
+                            ->get(),
+                        'error' => 'Invalid QR code or inactive employee'
                     ], 422);
                 }
             } else {
                 $employee = Employee::findOrFail($request->employee_id);
+                if ($employee->status !== 'active') {
+                    return response()->view('attendance.checkout', [
+                        'checkouts' => Attendance::with('employee')
+                            ->whereDate('date', now()->toDateString())
+                            ->whereNotNull('check_out_time')
+                            ->get(),
+                        'error' => 'Employee is inactive'
+                    ], 422);
+                }
             }
 
             $today = now()->toDateString();
             $existing = Attendance::where('employee_id', $employee->employee_id)
-                ->where('date', $today)
+                ->whereDate('date', $today)
                 ->first();
 
             if (!$existing || !$existing->check_in_time) {
                 return response()->view('attendance.checkout', [
-                    'checkouts' => Attendance::with('employee')->where('date', $today)->get(),
+                    'checkouts' => Attendance::with('employee')
+                        ->whereDate('date', $today)
+                        ->whereNotNull('check_out_time')
+                        ->get(),
                     'error' => 'Employee has not checked in today'
                 ], 422);
             }
 
             if ($existing->check_out_time) {
                 return response()->view('attendance.checkout', [
-                    'checkouts' => Attendance::with('employee')->where('date', $today)->get(),
+                    'checkouts' => Attendance::with('employee')
+                        ->whereDate('date', $today)
+                        ->whereNotNull('check_out_time')
+                        ->get(),
                     'error' => 'Employee already checked out today'
                 ], 422);
             }
@@ -188,7 +225,10 @@ class AttendanceController extends Controller
 
             DB::commit();
             return response()->view('attendance.checkout', [
-                'checkouts' => Attendance::with('employee')->where('date', $today)->get(),
+                'checkouts' => Attendance::with('employee')
+                    ->whereDate('date', $today)
+                    ->whereNotNull('check_out_time')
+                    ->get(),
                 'success' => 'Check-out recorded successfully'
             ]);
         } catch (\Exception $e) {
@@ -198,7 +238,10 @@ class AttendanceController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
             return response()->view('attendance.checkout', [
-                'checkouts' => Attendance::with('employee')->where('date', now()->toDateString())->get(),
+                'checkouts' => Attendance::with('employee')
+                    ->whereDate('date', now()->toDateString())
+                    ->whereNotNull('check_out_time')
+                    ->get(),
                 'error' => 'Failed to record check-out: ' . $e->getMessage()
             ], 500);
         }
@@ -221,16 +264,12 @@ class AttendanceController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            $validator = Validator::make($request->all(), [
+            $request->validate([
                 'check_in_time' => 'nullable|date_format:H:i',
                 'check_out_time' => 'nullable|date_format:H:i',
                 'check_in_method' => 'nullable|in:qr_camera,qr_upload,manual',
                 'check_out_method' => 'nullable|in:qr_camera,qr_upload,manual'
             ]);
-
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 422);
-            }
 
             $attendance = Attendance::findOrFail($id);
             $attendance->update($request->only([
@@ -244,8 +283,9 @@ class AttendanceController extends Controller
             $view = $attendance->check_out_time ? 'attendance.checkout' : 'attendance.checkin';
             return response()->view($view, [
                 $attendance->check_out_time ? 'checkouts' : 'checkins' => Attendance::with('employee')
-                    ->where('date', $today)
+                    ->whereDate('date', $today)
                     ->whereNotNull($attendance->check_out_time ? 'check_out_time' : 'check_in_time')
+                    ->orderByDesc($attendance->check_out_time ? 'check_out_time' : 'check_in_time')
                     ->get(),
                 'success' => 'Attendance updated successfully'
             ]);
@@ -268,8 +308,9 @@ class AttendanceController extends Controller
             $view = $isCheckout ? 'attendance.checkout' : 'attendance.checkin';
             return response()->view($view, [
                 $isCheckout ? 'checkouts' : 'checkins' => Attendance::with('employee')
-                    ->where('date', $today)
+                    ->whereDate('date', $today)
                     ->whereNotNull($isCheckout ? 'check_out_time' : 'check_in_time')
+                    ->orderByDesc($isCheckout ? 'check_out_time' : 'check_in_time')
                     ->get(),
                 'success' => 'Attendance record deleted'
             ]);
