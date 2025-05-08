@@ -1,3 +1,7 @@
+<script>
+console.log('Initial script running: Confirming JavaScript execution');
+</script>
+
 <div id="attendance-checkin-section">
     <h2>Check In</h2>
     <div class="mb-3">
@@ -11,26 +15,36 @@
             </div>
         </div>
         <div class="row">
-            <div class="col-md-6">
-                <h4>Record Check-In</h4>
-                <div class="card p-3 mb-3" hx-on::after-request="if (event.detail.xhr.status >= 400) {
-                    const response = JSON.parse(event.detail.xhr.responseText || '{}');
-                    document.getElementById('error-message').textContent = response.error || 'An error occurred';
-                    document.getElementById('error-container').style.display = 'block';
-                    document.getElementById('loading').style.display = 'none';
-                    setTimeout(() => document.getElementById('error-container').style.display = 'none', 5000);
-                }">
+            <div class="col-md-4">
+                <h4>Check-In via Camera</h4>
+                <div class="card p-3 mb-3">
                     <div class="mb-3">
                         <label class="form-label">QR Code Scan</label>
-                        <div class="d-flex">
-                            <button id="startCamera" class="btn btn-primary me-2">Start Camera</button>
-                            <input type="file" id="qrUpload" accept="image/*" class="form-control" style="width: auto;">
-                        </div>
-                        <video id="qrVideo" style="display: none; width: 100%; max-height: 300px;" autoplay></video>
+                        <button id="startCamera" class="btn btn-primary w-100">Start Camera</button>
+                        <button id="stopCamera" class="btn btn-danger w-100 mt-2" style="display: none;">Stop Camera</button>
+                        <video id="qrVideo" style="display: none; width: 100%; max-height: 200px;" autoplay playsinline></video>
                         <canvas id="qrCanvas" style="display: none;"></canvas>
+                        <div id="qrResult" class="mt-2" style="display: none;"></div>
                     </div>
+                    <button id="submitCameraCheckin" class="btn btn-primary w-100" disabled>Submit Camera Check-In</button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h4>Check-In via Image Upload</h4>
+                <div class="card p-3 mb-3">
                     <div class="mb-3">
-                        <label for="manualEmployee" class="form-label">Manual Check-In</label>
+                        <label for="qrUpload" class="form-label">Upload QR Code Image</label>
+                        <input type="file" id="qrUpload" accept="image/*" class="form-control">
+                        <div id="uploadPreview" class="mt-2 text-center"></div>
+                    </div>
+                    <button id="submitUploadCheckin" class="btn btn-primary w-100" disabled>Submit Upload Check-In</button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h4>Manual Check-In</h4>
+                <div class="card p-3 mb-3">
+                    <div class="mb-3">
+                        <label for="manualEmployee" class="form-label">Select Employee</label>
                         <select id="manualEmployee" class="form-control">
                             <option value="">Select Employee</option>
                             @foreach (App\Models\Employee::where('status', 'active')->get() as $employee)
@@ -38,10 +52,10 @@
                             @endforeach
                         </select>
                     </div>
-                    <button id="submitCheckin" class="btn btn-primary">Submit Check-In</button>
+                    <button id="submitManualCheckin" class="btn btn-primary w-100">Submit Manual Check-In</button>
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-12">
                 <h4>Today's Check-Ins</h4>
                 @if (session('success'))
                     <div class="alert alert-success alert-dismissible">
@@ -103,263 +117,235 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
+            </div>        </div>
     </div>
 </div>
 
-<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    console.log('DOM fully loaded and parsed');
-    const video = document.getElementById('qrVideo');
-    const canvas = document.getElementById('qrCanvas');
-    const context = canvas.getContext('2d');
-    const startCameraButton = document.getElementById('startCamera');
-    const qrUpload = document.getElementById('qrUpload');
-    const manualEmployee = document.getElementById('manualEmployee');
-    const submitCheckin = document.getElementById('submitCheckin');
-    const errorContainer = document.getElementById('error-container');
-    const errorMessage = document.getElementById('error-message');
-    const loading = document.getElementById('loading');
-    let stream = null;
-
-    // Verify CSRF token exists
-    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+(function() {
+    console.log('Main script running');
+    
+    // CSRF Token
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     if (!csrfToken) {
-        console.error('CSRF token meta tag not found!');
-        showError('System configuration error. Please reload the page.');
+        console.error('CSRF token not found');
+        alert('CSRF token missing. Please refresh the page.');
     }
 
+    // Camera Elements
+    const video = document.getElementById('qrVideo');
+    const canvas = document.getElementById('qrCanvas');
+    const startCameraBtn = document.getElementById('startCamera');
+    const stopCameraBtn = document.getElementById('stopCamera');
+    const submitCameraBtn = document.getElementById('submitCameraCheckin');
+    let stream = null;
+    let qrCode = null;
+
+    // Upload Elements
+    const qrUpload = document.getElementById('qrUpload');
+    const submitUploadBtn = document.getElementById('submitUploadCheckin');
+    const uploadPreview = document.getElementById('uploadPreview');
+
+    // Manual Check-In Elements
+    const manualEmployeeSelect = document.getElementById('manualEmployee');
+    const submitManualBtn = document.getElementById('submitManualCheckin');
+
+    // Error Handling
     function showError(message) {
-        console.error('Error:', message);
+        const errorContainer = document.getElementById('error-container');
+        const errorMessage = document.getElementById('error-message');
         if (errorContainer && errorMessage) {
             errorMessage.textContent = message;
             errorContainer.style.display = 'block';
             setTimeout(() => {
                 errorContainer.style.display = 'none';
             }, 5000);
-        } else {
-            alert(message);
         }
-        loading.style.display = 'none';
     }
 
-    function showSuccess(message) {
-        console.log('Success:', message);
-        const successContainer = document.createElement('div');
-        successContainer.className = 'alert alert-success alert-dismissible';
-        successContainer.innerHTML = `
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            ${message}
-        `;
-        document.getElementById('attendance-checkin-section').prepend(successContainer);
-        setTimeout(() => {
-            successContainer.remove();
-        }, 5000);
-        loading.style.display = 'none';
-    }
+    // Camera Functionality
+    startCameraBtn.addEventListener('click', async () => {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'environment' } 
+            });
+            video.srcObject = stream;
+            video.style.display = 'block';
+            startCameraBtn.style.display = 'none';
+            stopCameraBtn.style.display = 'block';
+            
+            // Start QR scanning
+            scanQRCode();
+        } catch (err) {
+            showError('Could not access camera: ' + err.message);
+        }
+    });
 
-    function stopCamera() {
+    stopCameraBtn.addEventListener('click', () => {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             video.srcObject = null;
             video.style.display = 'none';
-            stream = null;
-        }
-    }
-
-    startCameraButton.addEventListener('click', async () => {
-        console.log('Start camera button clicked');
-        try {
-            console.log('Requesting camera access...');
-            stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'environment' } 
-            });
-            console.log('Camera access granted');
-            
-            video.srcObject = stream;
-            video.style.display = 'block';
-            canvas.style.display = 'none';
-            
-            video.play().then(() => {
-                console.log('Video playback started');
-                scanQR();
-            }).catch(err => {
-                console.error('Video play failed:', err);
-                showError('Failed to start camera: ' + err.message);
-            });
-            
-        } catch (err) {
-            console.error('Camera access error:', err);
-            showError('Failed to access camera: ' + err.message);
+            startCameraBtn.style.display = 'block';
+            stopCameraBtn.style.display = 'none';
+            submitCameraBtn.disabled = true;
+            qrCode = null;
         }
     });
 
-    function scanQR() {
-        if (!video.videoWidth || !video.videoHeight) {
-            console.log('Waiting for video dimensions...');
-            requestAnimationFrame(scanQR);
-            return;
-        }
+    function scanQRCode() {
+        if (!stream) return;
 
-        console.log('Scanning QR code...');
-        try {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: 'attemptBoth'
-            });
-            
-            if (code) {
-                console.log('QR code detected:', code.data);
-                submitCheckinHandler(code.data, 'qr_camera');
-                stopCamera();
-            } else {
-                requestAnimationFrame(scanQR);
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext('2d');
+        
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: 'dontInvert',
+                });
+                
+                if (code) {
+                    qrCode = code.data;
+                    document.getElementById('qrResult').textContent = `Detected: ${qrCode}`;
+                    document.getElementById('qrResult').style.display = 'block';
+                    submitCameraBtn.disabled = false;
+                } else {
+                    submitCameraBtn.disabled = true;
+                }
             }
-        } catch (err) {
-            console.error('QR scanning error:', err);
-            showError('QR scanning error: ' + err.message);
-            stopCamera();
+            requestAnimationFrame(tick);
         }
+        tick();
     }
 
-    qrUpload.addEventListener('change', (event) => {
-        console.log('QR upload changed');
-        const file = event.target.files[0];
-        if (!file) {
-            console.log('No file selected');
-            return;
+    submitCameraBtn.addEventListener('click', () => {
+        if (qrCode) {
+            submitCheckin(qrCode, 'qr_camera');
+        } else {
+            showError('No QR code detected');
         }
-
-        if (!file.type.startsWith('image/')) {
-            showError('Please upload a valid image file.');
-            return;
-        }
-
-        console.log('Processing file:', file.name, 'Type:', file.type, 'Size:', file.size);
-
-        const reader = new FileReader();
-
-        reader.onload = (e) => {
-            console.log('File read successfully');
-            const img = new Image();
-
-            img.onload = () => {
-                console.log('Image loaded successfully. Dimensions:', img.width, 'x', img.height);
-
-                // Resize image if too large to improve QR detection
-                const maxSize = 800; // Maximum width/height
-                let width = img.width;
-                let height = img.height;
-
-                if (width > height && width > maxSize) {
-                    height = Math.round((height * maxSize) / width);
-                    width = maxSize;
-                } else if (height > maxSize) {
-                    width = Math.round((width * maxSize) / height);
-                    height = maxSize;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                context.drawImage(img, 0, 0, width, height);
-
-                try {
-                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                    console.log('Scanning for QR code...');
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                        inversionAttempts: 'attemptBoth' // Improve detection
-                    });
-
-                    if (code) {
-                        console.log('QR code found:', code.data);
-                        submitCheckinHandler(code.data, 'qr_upload');
-                    } else {
-                        console.log('No QR code found in image');
-                        showError('No QR code found in the uploaded image.');
-                    }
-                } catch (err) {
-                    console.error('Image processing error:', err);
-                    showError('Error processing image: ' + err.message);
-                }
-            };
-
-            img.onerror = () => {
-                console.error('Failed to load image');
-                showError('The selected file is not a valid image.');
-            };
-
-            img.src = e.target.result;
-        };
-
-        reader.onerror = () => {
-            console.error('File read error:', reader.error);
-            showError('Failed to read file: ' + reader.error.message);
-        };
-
-        console.log('Starting file read...');
-        reader.readAsDataURL(file);
     });
 
-    submitCheckin.addEventListener('click', () => {
-        submitCheckin.disabled = true;
-        submitCheckinHandler(null, 'manual');
-        setTimeout(() => {
-            submitCheckin.disabled = false;
-        }, 2000); // Re-enable after 2 seconds
+    // Upload Functionality
+    qrUpload.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            // Display preview
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                uploadPreview.innerHTML = `<img src="${event.target.result}" style="max-width: 100%; max-height: 200px;">`;
+            };
+            reader.readAsDataURL(file);
+
+            // Process QR code
+            const image = new Image();
+            image.src = URL.createObjectURL(file);
+            
+            image.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = image.width;
+                canvas.height = image.height;
+                const context = canvas.getContext('2d');
+                context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: 'dontInvert',
+                });
+                
+                if (code) {
+                    qrCode = code.data;
+                    submitUploadBtn.disabled = false;
+                } else {
+                    showError('No QR code found in the image');
+                    submitUploadBtn.disabled = true;
+                }
+            };
+        } catch (err) {
+            showError('Error processing image: ' + err.message);
+            submitUploadBtn.disabled = true;
+        }
     });
 
-    function submitCheckinHandler(qrData, method) {
-        const employeeId = manualEmployee.value;
-
-        if (!employeeId && !qrData) {
-            showError('Please select an employee or scan a QR code.');
-            submitCheckin.disabled = false;
-            return;
+    submitUploadBtn.addEventListener('click', () => {
+        if (qrCode) {
+            submitCheckin(qrCode, 'qr_upload');
+        } else {
+            showError('No QR code detected');
         }
+    });
 
-        // Prepare data for submission
-        const formData = new FormData();
+    // Manual Check-In Functionality
+    submitManualBtn.addEventListener('click', () => {
+        const employeeId = manualEmployeeSelect.value;
         if (employeeId) {
-            formData.append('employee_id', employeeId);
+            submitCheckin(employeeId, 'manual');
+        } else {
+            showError('Please select an employee for manual check-in.');
         }
-        if (qrData) {
-            formData.append('qr_code', qrData);
-        }
-        formData.append('method', method);
+    });
 
-        console.log('Submitting check-in:', {
-            employee_id: employeeId,
-            qr_code: qrData,
-            method: method
-        });
+    // Helper Function to Submit Check-In
+    function submitCheckin(employeeIdOrCode, method) {
+        const loading = document.getElementById('loading');
+        if (loading) loading.style.display = 'block';
 
-        loading.style.display = 'block';
-
-        // Make the HTMX request
-        htmx.ajax('POST', '{{ route("attendance.checkin.store") }}', {
-            target: '#attendance-checkin-section',
-            swap: 'innerHTML',
-            values: Object.fromEntries(formData),
-            headers: {
-                'X-CSRF-TOKEN': csrfToken.content
-            },
-            onBeforeRequest: () => {
-                console.log('Sending check-in request...');
-            },
-            onSuccess: () => {
-                console.log('Check-in response received');
-                showSuccess('Check-in recorded successfully.');
-            },
-            onError: (error) => {
-                console.error('Check-in request failed:', error);
-                showError('Failed to record check-in: ' + error.message);
+        let data = {};
+        if (method === 'manual') {
+            data = { employee_id: employeeIdOrCode };
+        } else {
+            // QR code methods
+            if (!employeeIdOrCode.startsWith('EMP-')) {
+                showError('Invalid QR code format');
+                if (loading) loading.style.display = 'none';
+                return;
             }
+            data = { qr_code: employeeIdOrCode, method: method === 'qr_camera' ? 'camera' : 'upload' };
+        }
+
+        fetch('/dashboard/attendance/store', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'text/html,application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 419) {
+                    throw new Error('CSRF token mismatch. Please refresh the page.');
+                }
+                return response.text().then(text => {
+                    throw new Error(`Server error: ${response.status} ${text}`);
+                });
+            }
+            return response.text();
+        })
+        .then(html => {
+            document.getElementById('attendance-checkin-section').innerHTML = html;
+            if (loading) loading.style.display = 'none';
+        })
+        .catch(error => {
+            console.error('Check-in submission failed:', error);
+            showError(error.message || 'Submission failed. Check console for details.');
+            if (loading) loading.style.display = 'none';
         });
     }
-});
+
+    // Global error handler
+    window.onerror = function(message, source, lineno, colno, error) {
+        console.error('Global error:', message, 'at', source, 'line', lineno, 'column', colno, 'Error object:', error);
+    };
+})();
 </script>

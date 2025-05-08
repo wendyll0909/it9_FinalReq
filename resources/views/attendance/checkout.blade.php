@@ -1,6 +1,15 @@
 <div id="attendance-checkout-section">
     <h2>Check Out</h2>
     <div class="mb-3">
+        <div id="error-container" class="alert alert-danger alert-dismissible" style="display: none;">
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <span id="error-message"></span>
+        </div>
+        <div id="loading" style="display: none;" class="text-center my-3">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
         <div class="row">
             <div class="col-md-6">
                 <h4>Record Check-Out</h4>
@@ -64,7 +73,7 @@
                         <tbody>
                             @forelse ($checkouts as $checkout)
                                 <tr>
-                                    <td>{{ $checkout->employee->fname }} {{ $checkout->employee->lname }}</td>
+                                    <td>{{ $checkout->employee ? ($checkout->employee->fname . ' ' . $checkout->employee->lname) : 'Unknown' }}</td>
                                     <td>{{ $checkout->check_in_time }}</td>
                                     <td>{{ $checkout->check_out_time }}</td>
                                     <td>{{ ucfirst(str_replace('_', ' ', $checkout->check_out_method)) }}</td>
@@ -95,113 +104,149 @@
     </div>
 </div>
 
-<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const video = document.getElementById('qrVideo');
-    const canvas = document.getElementById('qrCanvas');
-    const context = canvas.getContext('2d');
+    const canvasElement = document.getElementById('qrCanvas');
+    const canvas = canvasElement ? canvasElement.getContext('2d') : null;
     const startCameraButton = document.getElementById('startCamera');
-    const qrUpload = document.getElementById('qrUpload');
-    const manualEmployee = document.getElementById('manualEmployee');
-    const submitCheckout = document.getElementById('submitCheckout');
+    const qrUploadInput = document.getElementById('qrUpload');
+    const submitCheckoutButton = document.getElementById('submitCheckout');
+    const manualEmployeeSelect = document.getElementById('manualEmployee');
+    const loading = document.getElementById('loading');
     let stream = null;
 
-    startCameraButton.addEventListener('click', async () => {
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            video.srcObject = stream;
-            video.style.display = 'block';
-            canvas.style.display = 'none';
-            video.play();
-            scanQR();
-        } catch (err) {
-            console.error('Camera access failed:', err);
-            alert('Failed to access camera. Please use file upload or manual check-out.');
-        }
-    });
-
-    function scanQR() {
-        if (!video.videoWidth) {
-            requestAnimationFrame(scanQR);
-            return;
-        }
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-        if (code) {
-            submitCheckoutHandler(code.data, 'qr_camera');
-            stopCamera();
-        } else {
-            requestAnimationFrame(scanQR);
-        }
-    }
-
-    qrUpload.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    context.drawImage(img, 0, 0);
-                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height);
-                    if (code) {
-                        submitCheckoutHandler(code.data, 'qr_upload');
-                    } else {
-                        alert('No QR code found in the image.');
-                    }
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-
-    submitCheckout.addEventListener('click', () => {
-        if (manualEmployee.value) {
-            submitCheckoutHandler(null, 'manual', manualEmployee.value);
-        } else {
-            alert('Please select an employee for manual check-out or scan a QR code.');
-        }
-    });
-
-    function submitCheckoutHandler(qrCode, method, employeeId = null) {
-        const formData = new FormData();
-        if (qrCode) {
-            formData.append('qr_code', qrCode);
-        } else if (employeeId) {
-            formData.append('employee_id', employeeId);
-        }
-        formData.append('method', method);
-        formData.append('_token', document.querySelector('meta[name="csrf-token"]').content);
-
-        fetch('{{ route("attendance.checkout.store") }}', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.text())
-        .then(html => {
-            document.getElementById('attendance-checkout-section').innerHTML = html;
-        })
-        .catch(error => {
-            console.error('Check-out failed:', error);
-            alert('Failed to record check-out.');
+    // Start Camera for QR Scanning
+    if (startCameraButton && video && canvas) {
+        startCameraButton.addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                video.play();
+                requestAnimationFrame(tick);
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                showError('Failed to access camera: ' + error.message);
+            }
         });
     }
 
-    function stopCamera() {
+    // Stop Camera when Modal Closes (if applicable)
+    const stopCamera = () => {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             video.style.display = 'none';
+            stream = null;
+        }
+    };
+
+    // Process QR Code from Camera
+    function tick() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvasElement.height = video.videoHeight;
+            canvasElement.width = video.videoWidth;
+            canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+            const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code) {
+                console.log('QR Code detected:', code.data);
+                stopCamera();
+                submitCheckout(code.data, 'camera');
+            } else {
+                requestAnimationFrame(tick);
+            }
+        } else {
+            requestAnimationFrame(tick);
         }
     }
 
+    // Process QR Code from Uploaded Image
+    if (qrUploadInput && canvas) {
+        qrUploadInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        canvasElement.width = img.width;
+                        canvasElement.height = img.height;
+                        canvas.drawImage(img, 0, 0);
+                        const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height);
+                        if (code) {
+                            console.log('QR Code detected from upload:', code.data);
+                            submitCheckout(code.data, 'upload');
+                        } else {
+                            showError('No QR code detected in the uploaded image.');
+                        }
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // Submit Check-Out
+    if (submitCheckoutButton) {
+        submitCheckoutButton.addEventListener('click', () => {
+            const employeeId = manualEmployeeSelect ? manualEmployeeSelect.value : '';
+            if (employeeId) {
+                submitCheckout(employeeId, 'manual');
+            } else {
+                showError('Please select an employee for manual check-out.');
+            }
+        });
+    }
+
+    // Helper Function to Submit Check-Out
+    function submitCheckout(identifier, method) {
+        if (loading) loading.style.display = 'block';
+
+        const data = method === 'manual' ? { employee_id: identifier } : { qr_code: identifier, method: method === 'camera' ? 'camera' : 'upload' };
+
+        fetch('{{ route("attendance.checkout.store") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.error || 'Unknown error'); });
+            }
+            return response.text();
+        })
+        .then(html => {
+            document.getElementById('attendance-checkout-section').innerHTML = html;
+            if (loading) loading.style.display = 'none';
+        })
+        .catch(error => {
+            console.error('Check-out submission failed:', error);
+            showError(error.message);
+            if (loading) loading.style.display = 'none';
+        });
+    }
+
+    // Helper Function to Show Errors
+    function showError(message) {
+        const errorContainer = document.getElementById('error-container');
+        const errorMessage = document.getElementById('error-message');
+        if (errorContainer && errorMessage) {
+            errorMessage.textContent = message;
+            errorContainer.style.display = 'block';
+            setTimeout(() => {
+                errorContainer.style.display = 'none';
+            }, 5000);
+        }
+    }
+
+    // Handle Edit Attendance
     document.body.addEventListener('click', function (e) {
         if (e.target.classList.contains('edit-attendance')) {
             const attendanceId = e.target.getAttribute('data-id');
