@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="<?php echo csrf_token(); ?>">
-    <title>Nietes Design Builders - Dashboard</title>
+    <title></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo asset('assets/css/styles.css'); ?>">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -83,13 +83,6 @@
         }
         .user-menu .dropdown-item i {
             margin-right: 8px;
-        }
-        .user-menu .dropdown-item.logout {
-            color: #dc3545;
-        }
-        .user-menu .dropdown-item.logout:hover {
-            background-color: #f8d7da;
-            color: #dc3545;
         }
     </style>
 </head>
@@ -247,17 +240,14 @@
             </button>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDropdown">
                 <li>
-                    <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editUserModal">
+                    <a class="dropdown-item" href="#">
                         <i class="bi bi-person-circle"></i> User
                     </a>
                 </li>
                 <li>
-                    <a class="dropdown-item logout" href="#" onclick="document.getElementById('logout-form').submit();">
+                    <a class="dropdown-item" href="#" onclick="alert('Logout functionality not implemented yet. Please implement login/logout first.');">
                         <i class="bi bi-box-arrow-left"></i> Logout
                     </a>
-                    <form id="logout-form" action="<?php echo route('logout'); ?>" method="POST" style="display: none;">
-                        <?php echo csrf_field(); ?>
-                    </form>
                 </li>
             </ul>
         </div>
@@ -409,41 +399,6 @@
         </div>
     </div>
 
-    <!-- Edit User Modal -->
-    <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editUserModalLabel">Edit User Profile</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="editUserForm" action="<?php echo route('user.profile'); ?>" method="POST">
-                        <?php echo csrf_field(); ?>
-                        <input type="hidden" name="_method" value="PATCH">
-                        <div class="mb-3">
-                            <label for="name" class="form-label">Name</label>
-                            <input type="text" class="form-control" id="name" name="name" value="<?php echo auth()->user()->name ?? ''; ?>" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="email" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="email" name="email" value="<?php echo auth()->user()->email ?? ''; ?>" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">New Password (leave blank to keep current)</label>
-                            <input type="password" class="form-control" id="password" name="password">
-                        </div>
-                        <div class="mb-3">
-                            <label for="password_confirmation" class="form-label">Confirm New Password</label>
-                            <input type="password" class="form-control" id="password_confirmation" name="password_confirmation">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Update Profile</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -504,16 +459,6 @@
         }
         updateDateTime();
         setInterval(updateDateTime, 1000);
-
-        // Client-side validation for user profile form
-        document.getElementById('editUserForm').addEventListener('submit', function(event) {
-            const password = document.getElementById('password').value;
-            const passwordConfirmation = document.getElementById('password_confirmation').value;
-            if (password && password !== passwordConfirmation) {
-                event.preventDefault();
-                alert('Passwords do not match!');
-            }
-        });
     </script>
 </body>
 </html>
