@@ -10,10 +10,12 @@
 body {
     background-color: #F5F5F5;
     color: #333333;
+    overflow-x: hidden;
 }
 
 .container-fluid {
     display: flex;
+    min-height: 100vh;
 }
 
 .sidebar {
@@ -28,8 +30,8 @@ body {
     top: 0;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
     overflow-y: auto;
-    transition: transform 0.3s ease;
     z-index: 900;
+    transition: none !important;
 }
 
 @media (min-width: 769px) {
@@ -72,12 +74,11 @@ body {
     align-items: center;
     font-size: 16px;
     text-decoration: none;
-    transition: 0.2s ease-out;
     border-radius: 8px;
 }
 
 .sidebar .nav-link i {
-    font-size: 20px; /* Increased from 18px to 20px */
+    font-size: 20px;
     margin-right: 8px;
     color: #89c3cf;
 }
@@ -92,6 +93,7 @@ body {
     list-style: none;
     padding-left: 30px;
     margin-top: 5px;
+    display: none;
 }
 
 .employee-dropdown li,
@@ -109,12 +111,6 @@ body {
     border-radius: 5px;
 }
 
-.employee-dropdown .dropdown-link i,
-.attendance-dropdown .dropdown-link i {
-    font-size: 14px; /* Increased from 12px to 14px */
-    margin-right: 6px;
-}
-
 .employee-dropdown .dropdown-link:hover,
 .attendance-dropdown .dropdown-link:hover {
     background-color: #3a4143;
@@ -122,14 +118,13 @@ body {
 }
 
 .content {
-    margin-left: 0;
     flex-grow: 1;
-    padding: 20px 20px 20px 60px;
+    padding: 20px;
     background-color: #F5F5F5;
     color: #333333;
     width: 100%;
     min-height: 100vh;
-    transition: margin-left 0.3s ease, width 0.3s ease;
+    transition: none !important;
 }
 
 @media (min-width: 769px) {
@@ -161,7 +156,7 @@ body {
     padding: 10px;
     background-color: #2a2d2e;
     border-radius: 5px;
-    transition: background-color 0.2s ease;
+    display: none;
 }
 
 @media (min-width: 769px) {
@@ -174,66 +169,103 @@ body {
     background-color: #3a4143;
 }
 
-.breadcrumb {
-    background-color: #e9ecef;
-    padding: 10px;
+#dashboard-section {
+    position: relative;
+    width: 100%;
+}
+
+#dashboard-section .row {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.card {
+    position: relative;
+    transition: none !important;
+    transform: none !important;
+    will-change: auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border: none;
+    overflow: hidden;
+}
+
+.card-header {
+    background-color: #343a40;
+    color: white;
+    border-radius: 10px 10px 0 0 !important;
+    padding: 15px;
+    font-size: 1.1rem;
+    font-weight: 500;
+    border: none;
+}
+
+.attendance-card {
+    height: 585px;
+}
+
+.small-card {
+    height: calc(585px / 3 - 16px);
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 24px;
+}
+
+.datetime-display {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background-color: #343a40;
+    color: white;
+    padding: 10px 20px;
     border-radius: 5px;
-    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 2000;
+    font-size: 1.1rem;
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    min-width: 250px;
 }
 
-.table {
-    background-color: #ffffff;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+.user-menu {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 3000;
 }
 
-.table th,
-.table td {
-    vertical-align: middle;
+.user-menu .dropdown-menu {
+    min-width: 150px;
 }
 
-.pagination {
-    justify-content: center;
-    margin-top: 20px;
+.user-menu .btn {
+    background-color: #343a40;
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    padding: 8px 12px;
 }
 
-.modal-content {
-    border-radius: 10px;
+.user-menu .btn:hover {
+    background-color: #495057;
 }
 
-.btn-primary {
-    background-color: #2a2d2e;
-    border-color: #2a2d2e;
+.user-menu .dropdown-item i {
+    margin-right: 8px;
 }
 
-.btn-primary:hover {
-    background-color: #3a4143;
-    border-color: #3a4143;
+.user-menu .dropdown-item.logout {
+    color: #dc3545;
 }
 
-.btn-info {
-    background-color: #17a2b8;
-    border-color: #17a2b8;
-}
-
-.btn-info:hover {
-    background-color: #138496;
-    border-color: #138496;
-}
-
-.form-control {
-    border-radius: 5px;
-}
-
-#qrImage {
-    max-width: 100%;
-    height: auto;
-}
-
-.alert {
-    transition: opacity 0.5s ease-out;
-}
-
-.alert.fade-out {
-    opacity: 0;
-    display: none;
+@media (max-width: 768px) {
+    .datetime-display {
+        left: 10px;
+        right: auto;
+    }
+    .small-card {
+        height: auto;
+        min-height: 180px;
+    }
 }

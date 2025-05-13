@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log('Sidebar toggled, states:', { isSidebarToggled, isHamburgerHovered, isSidebarHovered, isNavigating });
         if (sidebar) {
             sidebar.classList.toggle('visible', isSidebarToggled);
+            contentArea.offsetHeight; // Force layout recalculation
+            setTimeout(() => window.removeCardTilt && window.removeCardTilt(), 50);
         }
     }
 
@@ -70,10 +72,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     dropdownToggles.forEach(toggle => {
         toggle.addEventListener('click', function (e) {
-            e.preventDefault();
             const dropdown = this.nextElementSibling;
             const isVisible = dropdown.style.display === 'block';
             console.log('Dropdown toggle clicked', { toggle: this.textContent, isVisible });
+
+            if (this.getAttribute('data-toggle-dropdown') && !this.getAttribute('hx-get')) {
+                e.preventDefault();
+            }
 
             document.querySelectorAll('.employee-dropdown, .attendance-dropdown').forEach(menu => {
                 menu.style.display = 'none';
@@ -94,18 +99,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const formIds = ['addEmployeeForm', 'editEmployeeForm', 'addPositionForm', 'editPositionForm', 'editAttendanceForm'];
         const isDeleteForm = e.target && e.target.id && (e.target.id.startsWith('deletePositionForm_') || e.target.id.startsWith('deleteAttendanceForm_'));
         const isFormRequest = e.target && e.target.id && (formIds.includes(e.target.id) || isDeleteForm);
-    
+
         if (isFormRequest && e.detail.successful) {
             document.querySelectorAll('.modal').forEach(modalEl => {
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
             });
-    
+
             const errorContainer = document.getElementById('error-message');
             if (errorContainer) errorContainer.style.display = 'none';
             const fallbackError = document.getElementById('fallback-error');
             if (fallbackError) fallbackError.style.display = 'none';
-    
+
             if (e.target.id === 'editEmployeeForm' || e.target.id === 'editAttendanceForm') {
                 const successContainer = document.getElementById('success-message');
                 if (successContainer) {
@@ -116,7 +121,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         }
-    
+
         if (isFormRequest && !e.detail.successful) {
             console.error(`HTMX request failed for ${e.target.id || 'unknown form'}:`, e.detail.xhr.status, e.detail.xhr.responseText);
             const errorContainer = document.getElementById('error-message') || document.getElementById('fallback-error');
@@ -131,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 errorContainer.style.display = 'block';
             }
         }
-    
+
         if (typeof isNavigating !== 'undefined' && isNavigating) {
             isNavigating = false;
             console.log('Navigation completed, isNavigating reset, states:', { isNavigating, isSidebarToggled });
@@ -166,7 +171,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         }
-        
     });
 
     const viewQrModal = document.getElementById('viewQrModal');
@@ -179,6 +183,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 });
+
 function downloadQR(qrCode) {
     try {
         if (!qrCode) {
